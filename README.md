@@ -8,6 +8,8 @@
 
 apt install apache2 php 
 
+a2enmod session
+
 В конфиге сервера openvpn надо включить интерфейс управления:
 
 management 127.0.0.1 3003 /etc/openvpn/server/password
