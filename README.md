@@ -19,11 +19,13 @@ management 127.0.0.1 3003 /etc/openvpn/server/password
 У апача должны быть права записи в каталог конфигурации пользователя:
 
 chmod 775 /etc/openvpn/server/server/ccd
+
 chown nobody:www-data -R /etc/openvpn/server/server/ccd
 
 И права на чтение списка сертфикатов и списка выданных адресов:
 
 chmod 655 /etc/openvpn/server/server/ipp.txt
+
 chmod 655 /etc/openvpn/server/server/rsa/pki/index.txt
 
 Конфигурация opnepvn-сервера в скрипте - в массив servers вписать нужные сервера:
