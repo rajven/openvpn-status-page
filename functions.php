@@ -242,7 +242,6 @@ function getBannedClients($server, $active_clients) {
 
 function isClientActive($active_clients,$username) {
     $active_names = array_column($active_clients, 'name');
-    if (!empty($active_names[$username])) { return true; }
+    if (in_array($username,$active_names)) { return true; }
     return false;
 }
-

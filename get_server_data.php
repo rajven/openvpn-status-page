@@ -95,7 +95,7 @@ ob_start();
 <div class="section">
     <div class="spoiler">
         <div class="spoiler-title collapsed" onclick="toggleSpoiler(this)">
-            Account List (<?= count($accounts) ?>)
+            Configured Account List (<?= count($accounts) ?>)
         </div>
         <div class="spoiler-content">
             <table>
@@ -108,13 +108,15 @@ ob_start();
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($accounts as $account): ?>
+                    <?php foreach ($accounts as $account):
+		    if (isClientActive($clients,$account["username"])) { continue; }
+		    ?>
                     <tr>
                         <td><?= htmlspecialchars($account["username"]) ?></td>
                         <td><?= htmlspecialchars($account['ip'] ?? 'N/A') ?></td>
                         <td>
                             <span class="status-badge <?= $account['banned'] ? 'status-banned' : 'status-active' ?>">
-                                <?= $account['banned'] ? 'BANNED' : 'ACTIVE' ?>
+                                <?= $account['banned'] ? 'BANNED' : 'ENABLED' ?>
                             </span>
                         </td>
                         <td class="actions">
