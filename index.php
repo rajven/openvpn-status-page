@@ -5,17 +5,12 @@ $page_title = 'OpenVPN Status';
 // Ограничение частоты запросов (в секундах)
 define('REQUEST_INTERVAL', 60);
 
-$servers = [
-    'server1' => [
-        'name' => 'server1',
-        'title' => 'Server1',
-        'config' => '/etc/openvpn/server/server.conf',
-        'ccd' => '/etc/openvpn/server/server/ccd',
-        'port' => '3003',
-        'host' => '127.0.0.1',
-        'password' => 'password'
-    ],
-];
+// Подключаем конфигурационный файл
+$config_file = __DIR__ . '/config.php';
+if (!file_exists($config_file)) {
+    die("Configuration file not found: $config_file");
+}
+$servers = require $config_file;
 
 session_start();
 
@@ -146,10 +141,60 @@ function getOpenVPNStatus($server) {
         }
     }
 
-  // Кэшируем результат
+    // Кэшируем результат
     $_SESSION['cached_status'][$server['name']] = $clients;
 
     return $clients;
+}
+
+function getAccountList($server) {
+    $accounts = [];
+    
+    // Получаем список из index.txt (неотозванные сертификаты)
+    if (file_exists($server['cert_index'])) {
+        $index_content = file_get_contents($server['cert_index']);
+        $lines = explode("\n", $index_content);
+        
+        foreach ($lines as $line) {
+            if (empty(trim($line))) continue;
+            
+            $parts = preg_split('/\s+/', $line);
+            if (count($parts) >= 6 && $parts[0] === 'V') { // Только валидные сертификаты
+                $username = $parts[5];
+                $accounts[$username]["username"] = $username;
+                $accounts[$username]["ip"] = $ip;
+                $accounts[$username]["banned"] = false;
+                if (isClientBanned($server,$username)) { 
+                    $accounts[$username]["banned"] = true;
+                    }
+            }
+        }
+    }
+
+    // Получаем список выданных IP из ipp.txt
+    $assigned_ips = [];
+    if (file_exists($server['ipp_file'])) {
+        $ipp_content = file_get_contents($server['ipp_file']);
+        $lines = explode("\n", $ipp_content);
+
+        foreach ($lines as $line) {
+            if (empty(trim($line))) continue;
+
+            $parts = explode(',', $line);
+            if (count($parts) >= 2) {
+                $username = $parts[0];
+                $ip = $parts[1];
+                $accounts[$username]["username"] = $username;
+                $accounts[$username]["ip"] = $ip;
+                $accounts[$username]["banned"] = false;
+                if (isClientBanned($server,$username)) { 
+                    $accounts[$username]["banned"] = true;
+                    }
+            }
+        }
+    }
+
+    return $accounts;
 }
 
 function isClientBanned($server, $client_name) {
@@ -212,6 +257,12 @@ function getBannedClients($server, $active_clients) {
     return $banned;
 }
 
+function isClientActive($active_clients,$username) {
+    $active_names = array_column($active_clients, 'name');
+    if (!empty($active_names[$username])) { return true; }
+    return false;
+}
+
 // Обработка POST-запросов
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     foreach ($servers as $server_name => $server) {
@@ -247,7 +298,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .status-active { background-color: #ccffcc; }
         .status-banned { background-color: #ff9999; }
         .server-section { border: 1px solid #ddd; padding: 15px; margin-bottom: 20px; border-radius: 5px; }
+        .spoiler { margin-top: 10px; }
+        .spoiler-title { 
+            cursor: pointer; 
+            color: #0066cc; 
+            padding: 5px;
+            background-color: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            display: inline-block;
+            margin-bottom: 5px;
+        }
+        .spoiler-title:after {
+            content: " ▼";
+        }
+        .spoiler-title.collapsed:after {
+            content: " ►";
+        }
+        .spoiler-content { 
+            display: none; 
+            padding: 10px; 
+            border: 1px solid #ddd; 
+            margin-top: 5px; 
+            background-color: #f9f9f9; 
+            border-radius: 3px;
+        }
     </style>
+    <script>
+        function toggleSpoiler(button) {
+            var content = button.nextElementSibling;
+            if (content.style.display === "block") {
+                content.style.display = "none";
+                button.classList.add('collapsed');
+            } else {
+                content.style.display = "block";
+                button.classList.remove('collapsed');
+            }
+        }
+    </script>
 </head>
 <body>
     <h1><?= htmlspecialchars($page_title) ?></h1>
@@ -256,6 +344,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <?php foreach ($servers as $server_name => $server): 
         $clients = getOpenVPNStatus($server);
         $banned_clients = getBannedClients($server, $clients);
+        $accounts = getAccountList($server);
     ?>
     <div class="server-section">
         <h2><?= htmlspecialchars($server['title']) ?></h2>
@@ -302,38 +391,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </table>
         </div>
 
-        <?php if (!empty($banned_clients)): ?>
         <div class="section">
-            <h3>Banned Clients (Not Connected)</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Client Name</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($banned_clients as $client): ?>
-                    <tr>
-                        <td><?= htmlspecialchars($client) ?></td>
-                        <td class="actions">
-                            <button type="submit" name="unban-<?= $server_name ?>" value="<?= htmlspecialchars($client) ?>" 
-                                    class="btn unban-btn">Unban</button>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
+            <div class="spoiler">
+                <div class="spoiler-title collapsed" onclick="toggleSpoiler(this)">
+                    Account List (<?= count($accounts) ?>)
+                </div>
+                <div class="spoiler-content">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Account</th>
+                                <th>Assigned IP</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($accounts as $account): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($account["username"]) ?></td>
+                                <td><?= htmlspecialchars($account['ip'] ?? 'N/A') ?></td>
+                                <td>
+                                    <span class="status-badge <?= $account['banned'] ? 'status-banned' : 'status-active' ?>">
+                                        <?= $account['banned'] ? 'BANNED' : 'ENABLED' ?>
+                                    </span>
+                                </td>
+                                <td class="actions">
+                                    <?php if ($account['banned']): ?>
+                                        <button type="submit" name="unban-<?= $server_name ?>" value="<?= htmlspecialchars($account['username']) ?>" 
+                                                class="btn unban-btn">Unban</button>
+                                    <?php else: ?>
+                                        <button type="submit" name="ban-<?= $server_name ?>" value="<?= htmlspecialchars($account['username']) ?>" 
+                                                class="btn ban-btn">Ban</button>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
-        <?php endif; ?>
     </div>
 
     <p>Next update in: <?= REQUEST_INTERVAL - (time() - $_SESSION['last_request_time'][$server['name']]) ?> seconds</p>
 
     <?php endforeach; ?>
     </form>
-
-<p>Last update: <?= date('Y-m-d H:i:s') ?></p>
-
 </body>
 </html>
+
