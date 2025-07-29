@@ -151,7 +151,7 @@ function getAccountList($server) {
     $accounts = [];
     
     // Получаем список из index.txt (неотозванные сертификаты)
-    if (file_exists($server['cert_index'])) {
+    if (!empty($server['cert_index']) && file_exists($server['cert_index'])) {
         $index_content = file_get_contents($server['cert_index']);
         $lines = explode("\n", $index_content);
         
@@ -173,7 +173,7 @@ function getAccountList($server) {
 
     // Получаем список выданных IP из ipp.txt
     $assigned_ips = [];
-    if (file_exists($server['ipp_file'])) {
+    if (!empty($server['ipp_file']) && file_exists($server['ipp_file'])) {
         $ipp_content = file_get_contents($server['ipp_file']);
         $lines = explode("\n", $ipp_content);
 
