@@ -24,9 +24,9 @@ chown nobody:www-data -R /etc/openvpn/server/server/ccd
 
 И права на чтение списка сертфикатов и списка выданных адресов:
 
-chmod 655 /etc/openvpn/server/server/ipp.txt
+chmod 644 /etc/openvpn/server/server/ipp.txt
 
-chmod 655 /etc/openvpn/server/server/rsa/pki/index.txt
+chmod 644 /etc/openvpn/server/server/rsa/pki/index.txt
 
 Конфигурация opnepvn-сервера в скрипте - в массив servers вписать нужные сервера:
 
