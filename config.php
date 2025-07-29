@@ -1,4 +1,9 @@
 <?php
+
+defined('CONFIG') or die('Direct access not allowed');
+
+define('REQUEST_INTERVAL', 60);
+
 // config.php - конфигурация OpenVPN серверов
 return [
     'server1' => [
