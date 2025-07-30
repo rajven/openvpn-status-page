@@ -28,7 +28,7 @@ a2enmod session
 
 ### Настройте OpenVPN:
 ```bash
-echo "management 127.0.0.1 3003 /etc/openvpn/server/password" >> /etc/openvpn/server.conf
+echo "management 127.0.0.1 3003 /etc/openvpn/server/password" >> /etc/openvpn/server/server1.conf
 echo "your_password" > /etc/openvpn/server/password
 ```
 
