@@ -21,12 +21,82 @@ if (!isset($_SESSION['last_request_time']) || !is_array($_SESSION['last_request_
     $_SESSION['last_request_time'] = []; // Создаем пустой массив
 }
 
+if (isset($_GET['action']) && $_GET['action'] === 'generate_config') {
+    session_start();
+    
+    // Проверка CSRF
+//    if (empty($_GET['csrf']) || $_GET['csrf'] !== $_SESSION['csrf_token']) {
+//        header('HTTP/1.0 403 Forbidden');
+//        die('Invalid CSRF token');
+//    }
+
+    $server_name = $_GET['server'] ?? '';
+    $username = $_GET['username'] ?? '';
+    
+    if (empty($username) || !isset($servers[$server_name])) {
+        die('Invalid parameters');
+    }
+    
+    $server = $servers[$server_name];
+    $script_path = SHOW_CERT_SCRIPT;
+    $pki_dir = dirname($server['cert_index']);
+    $template_path = $server['cfg_template'] ?? '';
+    
+    $output =[];
+    if (!empty($pki_dir)) {
+        // Безопасное выполнение скрипта
+	$command = sprintf(
+    	    'sudo %s %s %s 2>&1',
+            escapeshellcmd($script_path),
+	    escapeshellarg($username),
+    	    escapeshellarg($pki_dir)
+        );
+	exec($command, $output, $return_var);
+        if ($return_var !== 0) {
+	    die('Failed to generate config: ' . implode("\n", $output));
+	    }
+	}
+
+    // Формируем контент
+    $template_content = file_exists($template_path) && is_readable($template_path)
+        ? file_get_contents($template_path)
+        : null;
+    
+    // Получаем вывод скрипта
+    $script_output = !empty($output) ? implode("\n", $output) : null;
+    
+    // Формируем итоговый контент по приоритетам
+    if ($template_content !== null && $script_output !== null) {
+        // Оба источника доступны - объединяем
+        $config_content = $template_content . "\n" . $script_output;
+    } elseif ($template_content !== null) {
+        // Только шаблон доступен
+        $config_content = $template_content;
+    } elseif ($script_output !== null) {
+        // Только вывод скрипта доступен
+        $config_content = $script_output;
+    } else {
+        // Ничего не доступно - ошибка
+        die('Error: Neither template nor script output available');
+    }
+    
+    // Прямая отдача контента
+    header('Content-Type: application/octet-stream');
+    header('Content-Disposition: attachment; filename="' . $server['name'].'-'.$username . '.ovpn"');
+    header('Content-Length: ' . strlen($config_content));
+    echo $config_content;
+    $clean_url = strtok($_SERVER['REQUEST_URI'], '?');
+    header("Refresh:0; url=" . $clean_url);
+    exit;
+    }
+
 ?>
 
 <!DOCTYPE html>
 <html>
 <head>
     <title><?= htmlspecialchars($page_title) ?></title>
+    <meta name="csrf_token" content="<?= $_SESSION['csrf_token'] ?>">
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
         table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
@@ -66,6 +136,23 @@ if (!isset($_SESSION['last_request_time']) || !is_array($_SESSION['last_request_
         }
         .loading { color: #666; font-style: italic; }
         .last-update { font-size: 0.8em; color: #666; margin-top: 5px; }
+        .spinner {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            border-left-color: #09f;
+            animation: spin 1s linear infinite;
+            z-index: 1000;
+        }
+        @keyframes spin {
+            0% { transform: translate(-50%, -50%) rotate(0deg); }
+            100% { transform: translate(-50%, -50%) rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -164,6 +251,52 @@ if (!isset($_SESSION['last_request_time']) || !is_array($_SESSION['last_request_
                 button.classList.remove('collapsed');
             }
         }
+
+        function generateConfig(server, username, event) {
+            event.preventDefault();
+            
+            if (!confirm('Сгенерировать конфигурацию для ' + username + '?')) {
+                return false;
+            }
+            
+            // Индикатор загрузки
+            const spinner = document.createElement('div');
+            spinner.className = 'spinner';
+            document.body.appendChild(spinner);
+            
+            const csrf = document.querySelector('meta[name="csrf_token"]').content;
+            const params = new URLSearchParams({
+                server: server,
+                action: 'generate_config',
+                username: username,
+                csrf: csrf
+            });
+            
+            // Вариант 1: Простое открытие (рекомендуется)
+            window.open(`?${params.toString()}`, '_blank');
+            document.body.removeChild(spinner);
+            
+            /* 
+            // Вариант 2: Через fetch (если нужно строго AJAX)
+            fetch(`?${params.toString()}`, {
+                headers: {'X-Requested-With': 'XMLHttpRequest'}
+            })
+            .then(response => response.blob())
+            .then(blob => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${username}.ovpn`;
+                a.click();
+                URL.revokeObjectURL(url);
+            })
+            .catch(console.error)
+            .finally(() => document.body.removeChild(spinner));
+            */
+            
+            return false;
+        }
+
     </script>
 
 </body>

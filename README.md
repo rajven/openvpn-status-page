@@ -1,47 +1,77 @@
-Проект рисует страницу состояния Openvpn сервера
+# OpenVPN Status Monitor
 
-Возможности:
-- Отображаются подключенные пользователи
-- Можно забанить/разбанить пользователя
+Проект предоставляет веб-интерфейс для мониторинга состояния OpenVPN сервера.
 
-Для работы скрипта нужен апач и php на сервере с openvpn:
+## Возможности
 
-apt install apache2 php 
+- Отображение подключенных пользователей в реальном времени
+- Управление доступом:
+  - Блокировка/разблокировка пользователей (ban/unban)
+- Генерация конфигурационных файлов для клиентов
+- Автоматическое обновление данных (каждые 60 секунд)
 
+## Требования
+
+- Сервер с OpenVPN
+- Веб-сервер Apache2
+- PHP 7.4+
+- Доступ к управляющему интерфейсу OpenVPN
+
+## Установка
+
+###  Установите необходимые пакеты:
+
+```bash
+apt install apache2 php
 a2enmod session
+```
 
-В конфиге сервера openvpn надо включить интерфейс управления:
+### Настройте OpenVPN:
+```bash
+echo "management 127.0.0.1 3003 /etc/openvpn/server/password" >> /etc/openvpn/server.conf
+echo "your_password" > /etc/openvpn/server/password
+```
 
-management 127.0.0.1 3003 /etc/openvpn/server/password
+### Настройте права доступа:
+```bash
+chmod 775 /etc/openvpn/server/server1/ccd
+chown nobody:www-data -R /etc/openvpn/server/server1/ccd
+chmod 644 /etc/openvpn/server/server1/ipp.txt
+chmod 644 /etc/openvpn/server/server1/rsa/pki/index.txt
+```
 
-В файл /etc/openvpn/server/password надо на первой строчке написать пароль подключения
+### Установите скрипты:
+```bash
+cp addons/sudoers.d/www-data /etc/sudoers.d/
+cp addons/show_client_crt.sh /etc/openvpn/server/
+chmod 555 /etc/openvpn/server/show_client_crt.sh
+```
+### Создайте шаблон конфигурации клиента (без сертификатов) в каталоге сайта.
 
-У апача должны быть права записи в каталог конфигурации пользователя:
+### Отредактируйте файл конфигурации config.php
 
-chmod 775 /etc/openvpn/server/server/ccd
+```php
+'server1' => [
+    'name' => 'server1',
+    'title' => 'Server1',
+    'config' => '/etc/openvpn/server/server.conf',
+    'ccd' => '/etc/openvpn/server/server/ccd',
+    'port' => '3003',
+    'host' => '127.0.0.1',
+    'password' => 'password',
+    'cfg_template' => 'server1.ovpn.template',
+    'cert_index' => '/etc/openvpn/server/server/rsa/pki/index.txt',
+    'ipp_file' => '/etc/openvpn/server/server/ipp.txt'
+],
+```
+## Использование
 
-chown nobody:www-data -R /etc/openvpn/server/server/ccd
+Откройте веб-интерфейс в браузере
 
-И права на чтение списка сертфикатов и списка выданных адресов:
+Для управления пользователями используйте кнопки:
 
-chmod 644 /etc/openvpn/server/server/ipp.txt
+Ban - заблокировать пользователя
 
-chmod 644 /etc/openvpn/server/server/rsa/pki/index.txt
+Unban - разблокировать пользователя
 
-Конфигурация opnepvn-сервера в скрипте - в массив servers вписать нужные сервера:
-
-    'server1' => [
-        'name' => 'server1',
-        'title' => 'Server1',
-        'config' => '/etc/openvpn/server/server.conf',
-        'ccd' => '/etc/openvpn/server/server/ccd',
-        'port' => '3003',
-        'host' => '127.0.0.1',
-        'password' => 'password',
-        'cert_index' => '/etc/openvpn/server/server/rsa/pki/index.txt',
-        'ipp_file' => '/etc/openvpn/server/server/ipp.txt'
-    ],
-
-Ну и всё.
-
-Upd: Добавлено чтение пользователей VPN-сервера из списка выданных сертификатов и списка выданных ip-адресов. 
+Для скачивания конфигурации клиента нажмите на имя пользователя

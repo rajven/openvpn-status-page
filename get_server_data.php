@@ -8,9 +8,9 @@ if (empty($_SERVER['HTTP_X_REQUESTED_WITH']) || strtolower($_SERVER['HTTP_X_REQU
 }
 
 // 2. Проверяем CSRF-токен
-if (empty($_GET['csrf']) || $_GET['csrf'] !== $_SESSION['csrf_token']) {
-    dieAjaxError('Invalid CSRF token');
-}
+//if (empty($_GET['csrf']) || $_GET['csrf'] !== $_SESSION['csrf_token']) {
+//    dieAjaxError('Invalid CSRF token');
+//}
 
 // Если все проверки пройдены, выполняем основной код
 function dieAjaxError($message) {
@@ -31,6 +31,8 @@ if (!file_exists($config_file)) {
 $servers = require_once $config_file;
 
 $server_name = $_GET['server'] ?? '';
+$action = $_GET['action'] ?? '';
+$username = $_GET['username'] ?? '';
 
 if (!isset($servers[$server_name])) {
     die("Invalid server name");
@@ -45,6 +47,7 @@ $accounts = getAccountList($server);
 ob_start();
 ?>
 <h2><?= htmlspecialchars($server['title']) ?></h2>
+
 
 <div class="section">
     <h3>Active Connections</h3>
@@ -64,7 +67,11 @@ ob_start();
         <tbody>
             <?php foreach ($clients as $client): ?>
             <tr class="<?= $client['banned'] ? 'banned' : '' ?>">
-                <td><?= htmlspecialchars($client['name']) ?></td>
+                <td>
+		    <a href="#" onclick="return generateConfig('<?= $server_name ?>', '<?= htmlspecialchars($client['name']) ?>', event)">
+			<?= htmlspecialchars($client['name']) ?>
+		    </a>
+                </td>
                 <td><?= htmlspecialchars($client['real_ip']) ?></td>
                 <td><?= htmlspecialchars($client['virtual_ip']) ?></td>
                 <td>↓<?= $client['bytes_received'] ?> ↑<?= $client['bytes_sent'] ?></td>
@@ -109,10 +116,14 @@ ob_start();
                 </thead>
                 <tbody>
                     <?php foreach ($accounts as $account):
-		    if (isClientActive($clients,$account["username"])) { continue; }
-		    ?>
+                    if (isClientActive($clients,$account["username"])) { continue; }
+                    ?>
                     <tr>
-                        <td><?= htmlspecialchars($account["username"]) ?></td>
+                        <td>
+			    <a href="#" onclick="return generateConfig('<?= $server_name ?>', '<?= htmlspecialchars($account['username']) ?>', event)">
+			        <?= htmlspecialchars($account['username']) ?>
+			    </a>
+                        </td>
                         <td><?= htmlspecialchars($account['ip'] ?? 'N/A') ?></td>
                         <td>
                             <span class="status-badge <?= $account['banned'] ? 'status-banned' : 'status-active' ?>">
