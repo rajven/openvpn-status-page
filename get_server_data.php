@@ -60,6 +60,7 @@ ob_start();
                 <th>Virtual IP</th>
                 <th>Traffic</th>
                 <th>Connected</th>
+                <th>Cipher</th>
                 <th>Status</th>
                 <th>Actions</th>
             </tr>
@@ -76,6 +77,7 @@ ob_start();
                 <td><?= htmlspecialchars($client['virtual_ip']) ?></td>
                 <td>↓<?= $client['bytes_received'] ?> ↑<?= $client['bytes_sent'] ?></td>
                 <td><?= htmlspecialchars($client['connected_since']) ?></td>
+                <td><?= htmlspecialchars($client['cipher']) ?></td>
                 <td>
                     <span class="status-badge <?= $client['banned'] ? 'status-banned' : 'status-active' ?>">
                         <?= $client['banned'] ? 'BANNED' : 'Active' ?>

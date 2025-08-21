@@ -107,6 +107,7 @@ function getOpenVPNStatus($server) {
             continue;
         }
 
+//CLIENT_LIST,Common Name,Real Address,Virtual Address,Virtual IPv6 Address,Bytes Received,Bytes Sent,Connected Since,Connected Since (time_t),Username,Client ID,Peer ID,Data Channel Cipher
         if ($in_client_list && strpos($line, 'CLIENT_LIST') === 0) {
             $parts = explode(',', $line);
             if (count($parts) >= 9) {
@@ -118,7 +119,8 @@ function getOpenVPNStatus($server) {
                     'bytes_sent' => formatBytes($parts[6]),
                     'connected_since' => $parts[7],
                     'username' => $parts[8] ?? $parts[1],
-                    'banned' => isClientBanned($server, $parts[1])
+                    'cipher' => end($parts),
+                    'banned' => isClientBanned($server, $parts[1]),
                 ];
             }
         }
@@ -132,30 +134,28 @@ function getOpenVPNStatus($server) {
 
 function getAccountList($server) {
     $accounts = [];
-    
+
     // Получаем список из index.txt (неотозванные сертификаты)
     if (!empty($server['cert_index']) && file_exists($server['cert_index'])) {
         $index_content = file_get_contents($server['cert_index']);
         $lines = explode("\n", $index_content);
-        
+
         foreach ($lines as $line) {
             if (empty(trim($line))) continue;
-            
+
             $parts = preg_split('/\s+/', $line);
             if (count($parts) >= 6 && $parts[0] === 'V') { // Только валидные сертификаты
                 $username = $parts[5];
-                $accounts[$username]["username"] = $username;
-                $accounts[$username]["ip"] = $ip;
-                $accounts[$username]["banned"] = false;
-                if (isClientBanned($server,$username)) { 
-                    $accounts[$username]["banned"] = true;
-                    }
+                $accounts[$username] = [
+                    "username" => $username,
+                    "ip" => null,
+                    "banned" => isClientBanned($server, $username)
+                ];
             }
         }
     }
 
     // Получаем список выданных IP из ipp.txt
-    $assigned_ips = [];
     if (!empty($server['ipp_file']) && file_exists($server['ipp_file'])) {
         $ipp_content = file_get_contents($server['ipp_file']);
         $lines = explode("\n", $ipp_content);
@@ -167,12 +167,39 @@ function getAccountList($server) {
             if (count($parts) >= 2) {
                 $username = $parts[0];
                 $ip = $parts[1];
-                $accounts[$username]["username"] = $username;
+                if (!isset($accounts[$username])) {
+                    $accounts[$username] = [
+                        "username" => $username,
+                        "banned" => false
+                    ];
+                }
                 $accounts[$username]["ip"] = $ip;
-                $accounts[$username]["banned"] = false;
-                if (isClientBanned($server,$username)) { 
-                    $accounts[$username]["banned"] = true;
-                    }
+                $accounts[$username]["banned"] = isClientBanned($server, $username);
+            }
+        }
+    }
+
+    // Ищем IP-адреса в CCD файлах
+    if (!empty($server['ccd']) && is_dir($server['ccd'])) {
+        $ccd_files = scandir($server['ccd']);
+        foreach ($ccd_files as $file) {
+            if ($file === '.' || $file === '..') continue;
+            
+            $username = $file;
+            $filepath = $server['ccd'] . '/' . $file;
+            $content = file_get_contents($filepath);
+            
+            // Ищем строку ifconfig-push с IP адресом
+            if (preg_match('/ifconfig-push\s+(\d+\.\d+\.\d+\.\d+)/', $content, $matches)) {
+                $ip = $matches[1];
+                if (!isset($accounts[$username])) {
+                    $accounts[$username] = [
+                        "username" => $username,
+                        "banned" => false
+                    ];
+                }
+                $accounts[$username]["ip"] = $ip;
+                $accounts[$username]["banned"] = isClientBanned($server, $username);
             }
         }
     }
