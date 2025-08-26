@@ -69,9 +69,9 @@ ob_start();
             <?php foreach ($clients as $client): ?>
             <tr class="<?= $client['banned'] ? 'banned' : '' ?>">
                 <td>
-		    <a href="#" onclick="return generateConfig('<?= $server_name ?>', '<?= htmlspecialchars($client['name']) ?>', event)">
-			<?= htmlspecialchars($client['name']) ?>
-		    </a>
+                    <a href="#" onclick="return generateConfig('<?= $server_name ?>', '<?= htmlspecialchars($client['name']) ?>', event)">
+                        <?= htmlspecialchars($client['name']) ?>
+                    </a>
                 </td>
                 <td><?= htmlspecialchars($client['real_ip']) ?></td>
                 <td><?= htmlspecialchars($client['virtual_ip']) ?></td>
@@ -122,9 +122,9 @@ ob_start();
                     ?>
                     <tr>
                         <td>
-			    <a href="#" onclick="return generateConfig('<?= $server_name ?>', '<?= htmlspecialchars($account['username']) ?>', event)">
-			        <?= htmlspecialchars($account['username']) ?>
-			    </a>
+                            <a href="#" onclick="return generateConfig('<?= $server_name ?>', '<?= htmlspecialchars($account['username']) ?>', event)">
+                                <?= htmlspecialchars($account['username']) ?>
+                            </a>
                         </td>
                         <td><?= htmlspecialchars($account['ip'] ?? 'N/A') ?></td>
                         <td>

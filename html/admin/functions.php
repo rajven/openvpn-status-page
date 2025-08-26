@@ -136,23 +136,28 @@ function getAccountList($server) {
     $accounts = [];
 
     // Получаем список из index.txt (неотозванные сертификаты)
-    if (!empty($server['cert_index']) && file_exists($server['cert_index'])) {
-        $index_content = file_get_contents($server['cert_index']);
-        $lines = explode("\n", $index_content);
-
-        foreach ($lines as $line) {
-            if (empty(trim($line))) continue;
-
-            $parts = preg_split('/\s+/', $line);
-            if (count($parts) >= 6 && $parts[0] === 'V') { // Только валидные сертификаты
-                $username = $parts[5];
-                $accounts[$username] = [
-                    "username" => $username,
-                    "ip" => null,
-                    "banned" => isClientBanned($server, $username)
-                ];
-            }
-        }
+    if (!empty($server['cert_index']) && !empty(SHOW_PKI_INDEX) && file_exists(SHOW_PKI_INDEX)) {
+        // Безопасное выполнение скрипта
+	$command = sprintf(
+	    'sudo %s %s 2>&1',
+            escapeshellcmd(SHOW_PKI_INDEX),
+            escapeshellarg($server['cert_index']),
+        );
+	exec($command,  $index_content, $return_var);
+        if ($return_var == 0) {
+            foreach ($index_content as $line) {
+	        if (empty(trim($line))) continue;
+    	        $parts = preg_split('/\s+/', $line);
+        	if (count($parts) >= 1 && $parts[0] === 'V') { // Только валидные сертификаты
+		    $username = ltrim($parts[4], '/CN=');
+                    $accounts[$username] = [
+	                "username" => $username,
+    	                "ip" => null,
+        	        "banned" => isClientBanned($server, $username)
+            	    ];
+        	}
+    	    }
+	}
     }
 
     // Получаем список выданных IP из ipp.txt

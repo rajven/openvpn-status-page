@@ -9,7 +9,8 @@ $config_file = __DIR__ . '/config.php';
 if (!file_exists($config_file)) {
     die("Configuration file not found: $config_file");
 }
-$servers = require_once $config_file;
+
+$servers = require $config_file;
 
 // Проверяем AJAX-запрос
 if (empty($_SERVER['HTTP_X_REQUESTED_WITH']) || $_SERVER['HTTP_X_REQUESTED_WITH'] !== 'XMLHttpRequest') {

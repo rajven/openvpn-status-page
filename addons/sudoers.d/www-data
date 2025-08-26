@@ -1,1 +1,2 @@
 www-data ALL=(root)      NOPASSWD: /etc/openvpn/server/show_client_crt.sh
+www-data ALL=(root)      NOPASSWD: /etc/openvpn/server/show_index.sh

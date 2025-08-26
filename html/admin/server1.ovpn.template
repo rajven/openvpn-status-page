@@ -1,0 +1,29 @@
+client
+dev tun
+
+<connection>
+remote vpn1.example.com 443 udp
+nobind
+connect-timeout 15
+</connection>
+
+<connection>
+remote vpn2.example.com 443 tcp
+nobind
+connect-timeout 15
+</connection>
+
+resolv-retry infinite
+nobind
+persist-key
+persist-tun
+ns-cert-type server
+
+verb 2
+mute 20
+
+<ca>
+</ca>
+
+<tls-crypt>
+</tls-crypt>
