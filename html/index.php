@@ -161,7 +161,7 @@
                 </td>
             </tr>
                 <td><a href="/admin/" target="_blank">Панель администратора</a></td>
-                <td><a href="/admin/" target="_blank">Уголок пользователя</a></td>
+                <td><a href="/ccd/" target="_blank">Уголок пользователя</a></td>
             </tr>
         </table>
 
