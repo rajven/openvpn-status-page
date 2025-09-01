@@ -147,16 +147,13 @@ ob_start();
                             <?php else: ?>
                                 <?php if ($is_banned): ?>
 		        	    <button onclick="return confirmAction('unban', '<?= htmlspecialchars($account['username']) ?>', '<?= $server_name ?>', event)"
-//                                    <button onclick="handleAction('<?= $server_name ?>', 'unban', '<?= htmlspecialchars($account['username']) ?>')"
                                             class="btn unban-btn">Unban</button>
                                 <?php else: ?>
 			            <button onclick="return confirmAction('ban', '<?= htmlspecialchars($account['username']) ?>', '<?= $server_name ?>', event)"
-//                                    <button onclick="handleAction('<?= $server_name ?>', 'ban', '<?= htmlspecialchars($account['username']) ?>')"
                                             class="btn ban-btn">Ban</button>
                                 <?php endif; ?>
 				<?php if (!empty($server['cert_index'])): ?>
 			        <button onclick="return confirmAction('revoke', '<?= htmlspecialchars($account['username']) ?>', '<?= $server_name ?>', event)"
-//                                <button onclick="handleAction('<?= $server_name ?>', 'revoke', '<?= htmlspecialchars($account['username']) ?>')"
                                         class="btn revoke-btn">Revoke</button>
                                 <?php endif; ?>
                             <?php endif; ?>

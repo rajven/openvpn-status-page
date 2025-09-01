@@ -146,25 +146,25 @@ function isServerCertificate($cert_index_path, $username) {
     
     // Проверяем существование файла
     if (!file_exists($cert_file)) {
-        return 'fail: certificate file not found';
+        return 'success: certificate file not found';
     }
     
     // Читаем содержимое сертификата
     $cert_content = file_get_contents($cert_file);
     if ($cert_content === false) {
-        return 'fail: cannot read certificate file';
+        return 'success: cannot read certificate file';
     }
     
     // Парсим сертификат
     $cert_info = openssl_x509_parse($cert_content);
     if ($cert_info === false) {
-        return 'fail: invalid certificate format';
+        return 'success: invalid certificate format';
     }
     
     // Проверяем Subject CN (Common Name)
     $common_name = $cert_info['subject']['CN'] ?? '';
     if ( $common_name !==  $username) {
-        return 'fail: common name '.$common_name.' differ from username '.$username;
+        return 'success: common name '.$common_name.' differ from username '.$username;
     }
     
     // Проверяем Extended Key Usage (если есть)
