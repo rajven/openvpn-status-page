@@ -62,6 +62,7 @@ if [ $? -eq 0 ]; then
     ./easyrsa --batch gen-crl
 
     chown nobody:${ORIGINAL_USER} -R "$RSA_DIR/pki/issued/"
+    chown nobody:nogroup -R "$RSA_DIR/pki/crl.pem"
     chmod 640 "${RSA_DIR}"/pki/issued/*.crt
 
     if [ $? -eq 0 ]; then
