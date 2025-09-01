@@ -149,7 +149,7 @@ function getAccountList($server) {
 	        if (empty(trim($line))) continue;
     	        $parts = preg_split('/\s+/', $line);
         	if (count($parts) >= 1 && $parts[0] === 'V') { // Только валидные сертификаты
-		    $username = ltrim($parts[4], '/CN=');
+		    $username = substr(strstr(end($parts), '/CN='), 4);
                     $accounts[$username] = [
 	                "username" => $username,
     	                "ip" => null,

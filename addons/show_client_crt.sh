@@ -81,7 +81,8 @@ main() {
     
     # Output results
     echo "<cert>"
-    openssl x509 -in "${CERT_FILE}" -notext
+#    openssl x509 -in "${CERT_FILE}" -notext
+    openssl x509 -in "${CERT_FILE}"
     echo "</cert>"
     echo
     echo "<key>"
