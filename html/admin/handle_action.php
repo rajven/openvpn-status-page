@@ -35,6 +35,9 @@ try {
         case 'ban':
             $result = banClient($server, $client_name);
             break;
+        case 'revoke':
+            $result = revokeClient($server, $client_name);
+            break;
         case 'unban':
             $result = unbanClient($server, $client_name);
             break;

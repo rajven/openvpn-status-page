@@ -3,8 +3,10 @@
 defined('CONFIG') or die('Direct access not allowed');
 
 define('REQUEST_INTERVAL', 60);
-define('SHOW_CERT_SCRIPT','/etc/openvpn/server/show_client_crt.sh');
-define('SHOW_PKI_INDEX','/etc/openvpn/server/show_index.sh');
+define('SHOW_CERT_SCRIPT','/etc/openvpn/server/cmd/show_client_crt.sh');
+define('SHOW_PKI_INDEX','/etc/openvpn/server/cmd/show_index.sh');
+define('CREATE_CRT','/etc/openvpn/server/cmd/create_client.sh');
+define('REVOKE_CRT','/etc/openvpn/server/cmd/revoke_client.sh');
 
 // config.php - конфигурация OpenVPN серверов
 return [

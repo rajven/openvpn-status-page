@@ -91,6 +91,50 @@ if (isset($_GET['action']) && $_GET['action'] === 'generate_config') {
     exit;
     }
 
+// Обработка создания пользователя
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'create_user' && !empty(CREATE_CRT) && file_exists(CREATE_CRT)) {
+    // Проверка CSRF
+/*    if (empty($_POST['csrf']) || $_POST['csrf'] !== $_SESSION['csrf_token']) {
+        header('HTTP/1.0 403 Forbidden');
+        die(json_encode(['success' => false, 'message' => 'Invalid CSRF token']));
+    }
+*/
+
+    $server_name = $_POST['server'] ?? '';
+    $username = trim($_POST['username'] ?? '');
+    
+    if (empty($username) || !isset($servers[$server_name]) || empty($servers[$server_name]['cert_index'])) {
+        die(json_encode(['success' => false, 'message' => 'Invalid parameters']));
+    }
+
+    mb_internal_encoding('UTF-8');
+    $username = mb_strtolower($username);
+
+    // Проверка на пробельные символы
+    if (preg_match('/\s/', $username)) {
+        die(json_encode(['success' => false, 'message' => 'Username cannot contain spaces']));
+    }
+    
+    $server = $servers[$server_name];
+    $rsa_dir = dirname(dirname($server['cert_index']));
+
+    $script_path = CREATE_CRT;
+    $command = sprintf(
+        'sudo %s %s %s 2>&1',
+	escapeshellcmd($script_path),
+        escapeshellarg($rsa_dir),
+        escapeshellarg($username)
+    );
+    
+    exec($command, $output, $return_var);
+    
+    if ($return_var === 0) {
+        echo json_encode(['success' => true, 'message' => 'User created successfully']);
+    } else {
+        echo json_encode(['success' => false, 'message' => 'Failed to create user: ' . implode("\n", $output)]);
+    }
+    exit;
+}
 ?>
 
 <!DOCTYPE html>
@@ -154,11 +198,129 @@ if (isset($_GET['action']) && $_GET['action'] === 'generate_config') {
             0% { transform: translate(-50%, -50%) rotate(0deg); }
             100% { transform: translate(-50%, -50%) rotate(360deg); }
         }
+        .create-user-form {
+            margin: 15px 0;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        
+        .create-user-form input[type="text"],
+        .create-user-form select {
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            margin-right: 5px;
+        }
+        
+        .create-user-form button {
+            padding: 5px 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        
+        .create-user-form button:hover {
+            background-color: #45a049;
+        }
+        
+        .create-user-form .error {
+            color: #d9534f;
+            margin-top: 5px;
+        }
+        
+        .create-user-form .success {
+            color: #5cb85c;
+            margin-top: 5px;
+        }
+        
+        .user-creation-section {
+            margin-bottom: 30px;
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 5px;
+        }
+
+        /* Стили для временных сообщений */
+        .temp-message {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            border-radius: 5px;
+            color: white;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .temp-message.success {
+            background: green;
+        }
+        
+        .temp-message.error {
+            background: red;
+        }
+        
+        /* Стили для disabled кнопок */
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .revoked-text {
+            color: #999;
+            font-style: italic;
+        }
+        
+        .revoke-btn {
+            background-color: #ff9999;
+        }
+        .revoke-btn:hover {
+            background-color: #e65c00;
+        }
+
+        .ban-btn:hover {
+            background-color: #e65c00;
+        }
+
+        .unban-btn:hover {
+            background-color: #499E24;
+        }
+
     </style>
 </head>
 <body>
     <h1><?= htmlspecialchars($page_title) ?></h1>
-    
+
+    <!-- Секция создания пользователей -->
+    <div class="user-creation-section">
+        <h2>Create User</h2>
+        <div class="create-user-form">
+            <form onsubmit="return createUser(event)">
+                <select name="server" required>
+                    <option value="">Select Server</option>
+                    <?php foreach ($servers as $server_name => $server): ?>
+                        <?php if (!empty($server['cert_index'])): ?>
+                            <option value="<?= htmlspecialchars($server_name) ?>">
+                                <?= htmlspecialchars($server['title']) ?>
+                            </option>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
+                </select>
+                
+                <input type="text" name="username" placeholder="Username" required 
+                       pattern="[^\s]+" title="Username cannot contain spaces">
+                
+                <button type="submit">Create User</button>
+                <div class="message"></div>
+            </form>
+        </div>
+    </div>
+
     <div id="server-container">
         <?php foreach ($servers as $server_name => $server): ?>
         <div class="server-section" id="server-<?= htmlspecialchars($server_name) ?>">
@@ -298,6 +460,122 @@ if (isset($_GET['action']) && $_GET['action'] === 'generate_config') {
             return false;
         }
 
+        // Функция для создания пользователя
+        function createUser(event) {
+            event.preventDefault();
+            
+            const form = event.target;
+            const serverSelect = form.querySelector('select[name="server"]');
+            const usernameInput = form.querySelector('input[name="username"]');
+            const messageDiv = form.querySelector('.message');
+            const button = form.querySelector('button');
+            
+            const serverName = serverSelect.value;
+            const username = usernameInput.value.trim();
+            
+            // Валидация
+            if (!serverName) {
+                messageDiv.textContent = 'Please select a server';
+                messageDiv.className = 'message error';
+                return false;
+            }
+            
+            if (!username) {
+                messageDiv.textContent = 'Please enter username';
+                messageDiv.className = 'message error';
+                return false;
+            }
+            
+            if (/\s/.test(username)) {
+                messageDiv.textContent = 'Username cannot contain spaces';
+                messageDiv.className = 'message error';
+                return false;
+            }
+            
+            // Блокируем кнопку на время выполнения
+            button.disabled = true;
+            messageDiv.textContent = 'Creating user...';
+            messageDiv.className = 'message';
+            
+            const csrf = document.querySelector('meta[name="csrf_token"]').content;
+            
+            const formData = new FormData();
+            formData.append('server', serverName);
+            formData.append('action', 'create_user');
+            formData.append('username', username);
+            formData.append('csrf', csrf);
+            
+            fetch('', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    messageDiv.textContent = data.message || 'User created successfully';
+                    messageDiv.className = 'message success';
+                    usernameInput.value = '';
+                    
+                    // Перезагружаем данные выбранного сервера
+                    loadServerData(serverName);
+                } else {
+                    messageDiv.textContent = data.message || 'Error creating user';
+                    messageDiv.className = 'message error';
+                }
+            })
+            .catch(error => {
+                messageDiv.textContent = 'Request failed: ' + error.message;
+                messageDiv.className = 'message error';
+            })
+            .finally(() => {
+                button.disabled = false;
+                
+                // Очищаем сообщение через 5 секунд
+                setTimeout(() => {
+                    messageDiv.textContent = '';
+                    messageDiv.className = 'message';
+                }, 5000);
+            });
+            
+            return false;
+        }
+
+        // Простая версия с разными confirm сообщениями
+        function confirmAction(action, username, serverName, event) {
+            event.preventDefault();
+            let message;
+            let isDangerous = false;
+            switch(action) {
+                case 'ban':
+                    message = `Ban user ${username}?`;
+                    break;
+                case 'unban':
+                    message = `Unban user ${username}?`;
+                    break;
+                case 'revoke':
+                    message = `WARNING: Revoke certificate for ${username}?\n\nThis action is irreversible and will permanently disable the certificate!`;
+                    isDangerous = true;
+                    break;
+                default:
+                    message = `Perform ${action} on ${username}?`;
+            }
+            if (isDangerous) {
+                // Двойное подтверждение для опасных действий
+                if (confirm('⚠ ️ DANGEROUS ACTION - Please confirm')) {
+                    if (confirm(message)) {
+                        handleAction(serverName, action, username);
+                    }
+                }
+            } else {
+                if (confirm(message)) {
+                    handleAction(serverName, action, username);
+                }
+            }
+            return false;
+        }
     </script>
 
 </body>

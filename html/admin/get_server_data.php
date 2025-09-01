@@ -91,6 +91,8 @@ ob_start();
                         <button onclick="handleAction('<?= $server_name ?>', 'ban', '<?= htmlspecialchars($client['name']) ?>')" 
                                 class="btn ban-btn">Ban</button>
                     <?php endif; ?>
+                        <button onclick="handleAction('<?= $server_name ?>', 'revoke', '<?= htmlspecialchars($client['name']) ?>')" 
+                                class="btn ban-btn">Revoke</button>
                 </td>
             </tr>
             <?php endforeach; ?>
@@ -127,18 +129,36 @@ ob_start();
                             </a>
                         </td>
                         <td><?= htmlspecialchars($account['ip'] ?? 'N/A') ?></td>
+                        <?php
+                        $is_revoked = $account['revoked'];
+                        $is_banned = $account['banned'];
+                        $status_class = $is_revoked ? 'status-banned' : ($is_banned ? 'status-banned' : 'status-active');
+                        $status_text = $is_revoked ? 'REVOKED' : ($is_banned ? 'BANNED' : 'ENABLED');
+                        ?>
+                        
                         <td>
-                            <span class="status-badge <?= $account['banned'] ? 'status-banned' : 'status-active' ?>">
-                                <?= $account['banned'] ? 'BANNED' : 'ENABLED' ?>
+                            <span class="status-badge <?= $status_class ?>">
+                                <?= $status_text ?>
                             </span>
                         </td>
                         <td class="actions">
-                            <?php if ($account['banned']): ?>
-                                <button onclick="handleAction('<?= $server_name ?>', 'unban', '<?= htmlspecialchars($account['username']) ?>')" 
-                                        class="btn unban-btn">Unban</button>
+                            <?php if ($is_revoked): ?>
+                                <span class="revoked-text">Certificate revoked</span>
                             <?php else: ?>
-                                <button onclick="handleAction('<?= $server_name ?>', 'ban', '<?= htmlspecialchars($account['username']) ?>')" 
-                                        class="btn ban-btn">Ban</button>
+                                <?php if ($is_banned): ?>
+		        	    <button onclick="return confirmAction('unban', '<?= htmlspecialchars($account['username']) ?>', '<?= $server_name ?>', event)"
+//                                    <button onclick="handleAction('<?= $server_name ?>', 'unban', '<?= htmlspecialchars($account['username']) ?>')"
+                                            class="btn unban-btn">Unban</button>
+                                <?php else: ?>
+			            <button onclick="return confirmAction('ban', '<?= htmlspecialchars($account['username']) ?>', '<?= $server_name ?>', event)"
+//                                    <button onclick="handleAction('<?= $server_name ?>', 'ban', '<?= htmlspecialchars($account['username']) ?>')"
+                                            class="btn ban-btn">Ban</button>
+                                <?php endif; ?>
+				<?php if (!empty($server['cert_index'])): ?>
+			        <button onclick="return confirmAction('revoke', '<?= htmlspecialchars($account['username']) ?>', '<?= $server_name ?>', event)"
+//                                <button onclick="handleAction('<?= $server_name ?>', 'revoke', '<?= htmlspecialchars($account['username']) ?>')"
+                                        class="btn revoke-btn">Revoke</button>
+                                <?php endif; ?>
                             <?php endif; ?>
                         </td>
                     </tr>

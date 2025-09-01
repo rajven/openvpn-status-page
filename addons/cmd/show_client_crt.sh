@@ -6,7 +6,7 @@ set -o pipefail
 
 show_usage() {
     echo "Usage: $0 <login> [pki_dir]"
-    echo "Default pki_dir: /etc/openvpn/server/server1/rsa/pki"
+    echo "Default pki_dir: /etc/openvpn/server/server/rsa/pki"
     exit 1
 }
 

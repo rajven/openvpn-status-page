@@ -132,6 +132,56 @@ function getOpenVPNStatus($server) {
     return $clients;
 }
 
+function isServerCertificate($cert_index_path, $username) {
+    // Получаем путь к каталогу issued
+    $issued_dir = dirname(dirname($cert_index_path)) . '/pki/issued';
+    
+    // Проверяем существование каталога
+    if (!is_dir($issued_dir)) {
+        return 'fail: issued directory not found';
+    }
+    
+    // Формируем путь к файлу сертификата
+    $cert_file = $issued_dir . '/' . $username . '.crt';
+    
+    // Проверяем существование файла
+    if (!file_exists($cert_file)) {
+        return 'fail: certificate file not found';
+    }
+    
+    // Читаем содержимое сертификата
+    $cert_content = file_get_contents($cert_file);
+    if ($cert_content === false) {
+        return 'fail: cannot read certificate file';
+    }
+    
+    // Парсим сертификат
+    $cert_info = openssl_x509_parse($cert_content);
+    if ($cert_info === false) {
+        return 'fail: invalid certificate format';
+    }
+    
+    // Проверяем Subject CN (Common Name)
+    $common_name = $cert_info['subject']['CN'] ?? '';
+    if ( $common_name !==  $username) {
+        return 'fail: common name '.$common_name.' differ from username '.$username;
+    }
+    
+    // Проверяем Extended Key Usage (если есть)
+    $ext_key_usage = $cert_info['extensions']['extendedKeyUsage'] ?? '';
+    
+    // Проверяем, является ли это серверным сертификатом
+    // Серверные сертификаты обычно имеют:
+    // 1. CN, содержащее имя сервера (например, "server")
+    // 2. Extended Key Usage: TLS Web Server Authentication
+    $is_server_cert = (
+        stripos($ext_key_usage, 'TLS Web Server Authentication') !== false ||
+        stripos($ext_key_usage, 'serverAuth') !== false
+    );
+
+    return $is_server_cert ? 'fail: server certificate detected' : 'success';
+}
+
 function getAccountList($server) {
     $accounts = [];
 
@@ -146,18 +196,23 @@ function getAccountList($server) {
 	exec($command,  $index_content, $return_var);
         if ($return_var == 0) {
             foreach ($index_content as $line) {
-	        if (empty(trim($line))) continue;
-    	        $parts = preg_split('/\s+/', $line);
-        	if (count($parts) >= 1 && $parts[0] === 'V') { // Только валидные сертификаты
-		    $username = substr(strstr(end($parts), '/CN='), 4);
-                    $accounts[$username] = [
-	                "username" => $username,
-    	                "ip" => null,
-        	        "banned" => isClientBanned($server, $username)
-            	    ];
-        	}
-    	    }
-	}
+	        if (empty(trim($line))) { continue; }
+		if (preg_match('/\/CN=([^\/]+)/', $line, $matches)) {
+		        $username = trim($matches[1]);
+			}
+		if (empty($username)) { continue; }
+		$revoked = false;
+		if (preg_match('/^R\s+/',$line)) { $revoked = true; }
+		$result = isServerCertificate($server['cert_index'], $username);
+		if (strpos($result, 'fail:') === 0) { continue; }
+                $accounts[$username] = [
+	        	"username" => $username,
+	        	"ip" => null,
+        		"banned" => isClientBanned($server, $username) || $revoked,
+			"revoked" => $revoked
+        		];
+		}
+	    }
     }
 
     // Получаем список выданных IP из ipp.txt
@@ -172,14 +227,17 @@ function getAccountList($server) {
             if (count($parts) >= 2) {
                 $username = $parts[0];
                 $ip = $parts[1];
-                if (!isset($accounts[$username])) {
+                if (!isset($accounts[$username]) && empty($server['cert_index'])) {
                     $accounts[$username] = [
                         "username" => $username,
-                        "banned" => false
+                        "banned" => isClientBanned($server, $username),
+			"ip" => $ip,
+			"revoked" => false,
                     ];
                 }
-                $accounts[$username]["ip"] = $ip;
-                $accounts[$username]["banned"] = isClientBanned($server, $username);
+                if (isset($accounts[$username]) and !empty($server['cert_index'])) {
+		    $accounts[$username]["ip"] = $ip;
+		}
             }
         }
     }
@@ -197,18 +255,20 @@ function getAccountList($server) {
             // Ищем строку ifconfig-push с IP адресом
             if (preg_match('/ifconfig-push\s+(\d+\.\d+\.\d+\.\d+)/', $content, $matches)) {
                 $ip = $matches[1];
-                if (!isset($accounts[$username])) {
+                if (!isset($accounts[$username]) && empty($server['cert_index'])) {
                     $accounts[$username] = [
                         "username" => $username,
-                        "banned" => false
+                        "banned" => isClientBanned($server, $username),
+			"ip" => $ip,
+			"revoked" => false,
                     ];
                 }
-                $accounts[$username]["ip"] = $ip;
-                $accounts[$username]["banned"] = isClientBanned($server, $username);
+                if (isset($accounts[$username]) and !empty($server['cert_index'])) {
+		    $accounts[$username]["ip"] = $ip;
+		}
             }
         }
     }
-
     return $accounts;
 }
 
@@ -234,6 +294,31 @@ function banClient($server, $client_name) {
     // Кикаем клиента
     kickClient($server, $client_name);
     return true;
+}
+
+function revokeClient($server, $client_name) {
+    if (empty(REVOKE_CRT) || !file_exists(REVOKE_CRT)) {
+	return banClient($server, $client_name);
+	}
+
+    $script_path = REVOKE_CRT;
+    $rsa_dir = dirname(dirname($server['cert_index']));
+
+    $command = sprintf(
+        'sudo %s %s %s %s 2>&1',
+	escapeshellcmd($script_path),
+        escapeshellarg('openvpn-server@'.$server['name']),
+        escapeshellarg($rsa_dir),
+        escapeshellarg($client_name)
+    );
+
+    exec($command, $output, $return_var);
+
+    if ($return_var === 0) {
+	return true;
+    } else {
+	return false;
+    }
 }
 
 function unbanClient($server, $client_name) {
