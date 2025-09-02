@@ -10,10 +10,23 @@ show_usage() {
     exit 1
 }
 
+log() {
+    logger -t "openvpn-www" -p user.info "$1"
+    echo "$1"  # Также выводим в консоль для обратной связи
+}
+
+# Проверка прав
+check_permissions() {
+    if [[ $EUID -ne 0 ]]; then
+        log "Error: This script must be run as root" >&2
+        exit 1
+    fi
+}
+
 validate_pki_dir() {
     local pki_dir=$1
     if [[ ! -d "${pki_dir}" || ! -f "${pki_dir}/index.txt" ]]; then
-        echo "Error: Invalid PKI directory - missing index.txt" >&2
+        log "Error: Invalid PKI directory - missing index.txt"
         exit 2
     fi
 }
@@ -56,6 +69,8 @@ main() {
     # Argument handling
     [[ $# -lt 1 ]] && show_usage
     
+    check_permissions
+
     local CN=$1
     local PKI_DIR=${2:-/etc/openvpn/server/server/rsa/pki}
     
@@ -64,7 +79,7 @@ main() {
     # Find certificate
     local CERT_FILE
     CERT_FILE=$(find_cert_file "${CN}" "${PKI_DIR}") || {
-        echo "Error: Certificate for CN=${CN} not found" >&2
+        log "Error: Certificate for CN=${CN} not found"
         exit 3
     }
     
@@ -75,13 +90,12 @@ main() {
     # Find private key
     local KEY_FILE
     KEY_FILE=$(find_key_file "${CN}" "${PKI_DIR}" "${SERIAL}") || {
-        echo "Error: Private key for CN=${CN} not found" >&2
+        log "Error: Private key for CN=${CN} not found"
         exit 4
     }
     
     # Output results
     echo "<cert>"
-#    openssl x509 -in "${CERT_FILE}" -notext
     openssl x509 -in "${CERT_FILE}"
     echo "</cert>"
     echo

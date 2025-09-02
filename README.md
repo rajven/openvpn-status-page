@@ -7,8 +7,20 @@
 - Отображение подключенных пользователей в реальном времени
 - Управление доступом:
   - Блокировка/разблокировка пользователей (ban/unban)
-- Генерация конфигурационных файлов для клиентов
-- Автоматическое обновление данных (каждые 60 секунд)
+  - Создание сертификата клиента
+  - Удаление конфигурационного файла клиента
+  - Отзыв сертификата клиента
+- Генерация конфигурационных файлов для клиентов (открыть ссылку /ccd в браузере)
+- Автоматическое обновление данных (каждые 30 секунд)
+
+## !!!Важно!!!
+
+Каталог /ccd надо либо не устанавливать вообще, либо закрыть паролем через вэб-сервер. 
+Пользователи, которым выдаёте доступ должны совпадать с логином клиента в впн-сервере. 
+Тогда пользователь при обращении на данную ссылку сможет получить свой конфигурационный файл.
+Базу авторизации делать не стал специально - проще использовать авторизацию в вэб-сервере.
+
+Каталог /admin - закрывайте паролем обязательно. 
 
 ## Требования
 
@@ -22,7 +34,7 @@
 ###  Установите необходимые пакеты:
 
 ```bash
-apt install apache2 php
+apt install apache2 php php-mbstring
 a2enmod session
 ```
 
@@ -32,23 +44,21 @@ echo "management 127.0.0.1 3003 /etc/openvpn/server/password" >> /etc/openvpn/se
 echo "your_password" > /etc/openvpn/server/password
 ```
 
-### Настройте права доступа:
-```bash
-chmod 775 /etc/openvpn/server/server1/ccd
-chown nobody:www-data -R /etc/openvpn/server/server1/ccd
-chmod 644 /etc/openvpn/server/server1/ipp.txt
-chmod 644 /etc/openvpn/server/server1/rsa/pki/index.txt
-```
-
 ### Установите скрипты:
 ```bash
 cp addons/sudoers.d/www-data /etc/sudoers.d/
-cp addons/show_client_crt.sh /etc/openvpn/server/
-chmod 555 /etc/openvpn/server/show_client_crt.sh
+mkdir -p /etc/openvpn/server/cmd
+cp addons/cmd/*.sh /etc/openvpn/server/cmd/
+chmod 755 /etc/openvpn/server/cmd/
+chmod 555 /etc/openvpn/server/cmd/*.sh
 ```
 ### Создайте шаблон конфигурации клиента (без сертификатов) в каталоге сайта.
 
 ### Отредактируйте файл конфигурации config.php
+
+Здесь name - это имя сервиса в systemd!!! т.е. если сервис называется openvpn-server@server1, то name=server1
+
+Если какие-то опции не используются - значение долно быть пустым
 
 ```php
 'server1' => [
@@ -73,5 +83,9 @@ chmod 555 /etc/openvpn/server/show_client_crt.sh
 Ban - заблокировать пользователя
 
 Unban - разблокировать пользователя
+
+Revoke - отозвать сертификат
+
+Remove - удалить ccd-файл конфигурации пользователя
 
 Для скачивания конфигурации клиента нажмите на имя пользователя

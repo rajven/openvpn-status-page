@@ -6,19 +6,24 @@ log() {
     echo "$1"  # Также выводим в консоль для обратной связи
 }
 
+# Проверка прав
+check_permissions() {
+    if [[ $EUID -ne 0 ]]; then
+        log "Error: This script must be run as root" >&2
+        exit 1
+    fi
+}
+
 if [ $# -ne 3 ]; then
     log "Usage: $0 <service_name> <rsa_dir> <username>"
     exit 1
 fi
 
+check_permissions
+
 SRV_NAME="${1}"
 RSA_DIR="${2}"
 USERNAME="${3}"
-
-ORIGINAL_USER="$SUDO_USER"
-if [ -z "${ORIGINAL_USER}" ]; then
-    ORIGINAL_USER='www-data'
-fi
 
 log "Starting certificate revocation for $USERNAME by user $ORIGINAL_USER"
 
@@ -61,12 +66,12 @@ if [ $? -eq 0 ]; then
     log "Generating CRL..."
     ./easyrsa --batch gen-crl
 
-    chown nobody:${ORIGINAL_USER} -R "$RSA_DIR/pki/issued/"
-    chown nobody:nogroup -R "$RSA_DIR/pki/crl.pem"
-    chmod 640 "${RSA_DIR}"/pki/issued/*.crt
-
     if [ $? -eq 0 ]; then
         log "CRL generated successfully"
+
+        chown nobody:nogroup -R "$RSA_DIR/pki/issued/"
+	chown nobody:nogroup -R "$RSA_DIR/pki/crl.pem"
+        chmod 640 "${RSA_DIR}"/pki/issued/*.crt
 
         # Рестартуем сервис
         log "Restarting service: $SRV_NAME"

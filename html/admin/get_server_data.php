@@ -40,7 +40,7 @@ if (!isset($servers[$server_name])) {
 
 $server = $servers[$server_name];
 $clients = getOpenVPNStatus($server);
-$banned_clients = getBannedClients($server, $clients);
+$banned_clients = getBannedClients($server);
 $accounts = getAccountList($server);
 
 // Генерируем HTML для этого сервера
@@ -91,8 +91,10 @@ ob_start();
                         <button onclick="handleAction('<?= $server_name ?>', 'ban', '<?= htmlspecialchars($client['name']) ?>')" 
                                 class="btn ban-btn">Ban</button>
                     <?php endif; ?>
+		    <?php if (!empty($server['cert_index'])): ?>
                         <button onclick="handleAction('<?= $server_name ?>', 'revoke', '<?= htmlspecialchars($client['name']) ?>')" 
-                                class="btn ban-btn">Revoke</button>
+                	        class="btn ban-btn">Revoke</button>
+                    <?php endif; ?>
                 </td>
             </tr>
             <?php endforeach; ?>
@@ -155,6 +157,9 @@ ob_start();
 				<?php if (!empty($server['cert_index'])): ?>
 			        <button onclick="return confirmAction('revoke', '<?= htmlspecialchars($account['username']) ?>', '<?= $server_name ?>', event)"
                                         class="btn revoke-btn">Revoke</button>
+                                <?php else: ?>
+			        <button onclick="return confirmAction('remove', '<?= htmlspecialchars($account['username']) ?>', '<?= $server_name ?>', event)"
+                                        class="btn remove-btn">Remove CCD</button>
                                 <?php endif; ?>
                             <?php endif; ?>
                         </td>

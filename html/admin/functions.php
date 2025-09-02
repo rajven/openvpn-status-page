@@ -19,14 +19,14 @@ function openvpnManagementCommand($server, $command) {
 
     $timeout = 5;
     $socket = @fsockopen($mgmt_host, $mgmt_port, $errno, $errstr, $timeout);
-    
+
     if (!$socket) {
         error_log("OpenVPN management connection failed to {$server['name']}: $errstr ($errno)");
         return false;
     }
 
     stream_set_timeout($socket, $timeout);
-    
+
     try {
         // Читаем приветственное сообщение
         $welcome = '';
@@ -90,6 +90,8 @@ function getOpenVPNStatus($server) {
     $response = openvpnManagementCommand($server, "status 2");
     if (!$response) return $_SESSION['cached_status'][$server['name']] ?? [];
 
+    $banned = getBannedClients($server);
+
     $clients = [];
     $lines = explode("\n", $response);
     $in_client_list = false;
@@ -120,7 +122,7 @@ function getOpenVPNStatus($server) {
                     'connected_since' => $parts[7],
                     'username' => $parts[8] ?? $parts[1],
                     'cipher' => end($parts),
-                    'banned' => isClientBanned($server, $parts[1]),
+                    'banned' => isset($banned[$parts[1]]),
                 ];
             }
         }
@@ -132,181 +134,315 @@ function getOpenVPNStatus($server) {
     return $clients;
 }
 
-function isServerCertificate($cert_index_path, $username) {
-    // Получаем путь к каталогу issued
-    $issued_dir = dirname(dirname($cert_index_path)) . '/pki/issued';
-    
-    // Проверяем существование каталога
-    if (!is_dir($issued_dir)) {
-        return 'fail: issued directory not found';
+function get_servers_crt($cert_index) {
+    // Проверка входных параметров
+    if (empty($cert_index) || !is_string($cert_index)) {
+        return false;
     }
-    
-    // Формируем путь к файлу сертификата
-    $cert_file = $issued_dir . '/' . $username . '.crt';
-    
-    // Проверяем существование файла
-    if (!file_exists($cert_file)) {
-        return 'success: certificate file not found';
+
+    // Проверка существования исполняемого файла
+    if (empty(SHOW_SERVERS_CRT) || !file_exists(SHOW_SERVERS_CRT) || !is_executable(SHOW_SERVERS_CRT)) {
+        error_log('SHOW_SERVERS_CRT is not configured properly', 0);
+        return false;
     }
-    
-    // Читаем содержимое сертификата
-    $cert_content = file_get_contents($cert_file);
-    if ($cert_content === false) {
-        return 'success: cannot read certificate file';
-    }
-    
-    // Парсим сертификат
-    $cert_info = openssl_x509_parse($cert_content);
-    if ($cert_info === false) {
-        return 'success: invalid certificate format';
-    }
-    
-    // Проверяем Subject CN (Common Name)
-    $common_name = $cert_info['subject']['CN'] ?? '';
-    if ( $common_name !==  $username) {
-        return 'success: common name '.$common_name.' differ from username '.$username;
-    }
-    
-    // Проверяем Extended Key Usage (если есть)
-    $ext_key_usage = $cert_info['extensions']['extendedKeyUsage'] ?? '';
-    
-    // Проверяем, является ли это серверным сертификатом
-    // Серверные сертификаты обычно имеют:
-    // 1. CN, содержащее имя сервера (например, "server")
-    // 2. Extended Key Usage: TLS Web Server Authentication
-    $is_server_cert = (
-        stripos($ext_key_usage, 'TLS Web Server Authentication') !== false ||
-        stripos($ext_key_usage, 'serverAuth') !== false
+
+    $command = sprintf(
+        'sudo %s %s 2>&1',
+        escapeshellcmd(SHOW_SERVERS_CRT),
+        escapeshellarg($cert_index)
     );
 
-    return $is_server_cert ? 'fail: server certificate detected' : 'success';
+    exec($command, $cert_content, $return_var);
+
+    if ($return_var !== 0) {
+        error_log(sprintf(
+            'Command failed: %s (return code: %d, output: %s)',
+            $command,
+            $return_var,
+            implode("\n", $cert_content)
+        ), 0);
+        return false;
+    }
+
+    if (empty($cert_content)) {
+        error_log('Empty certificate content for file: '.$cert_index, 0);
+        return false;
+    }
+
+    $result = array_fill_keys($cert_content, true);
+
+    return $result;
+}
+
+function getBannedClients($server) {
+    // Проверка входных параметров
+    if (empty($server["ccd"]) || !is_string($server["ccd"])) {
+        return [];
+    }
+
+    // Проверка существования исполняемого файла
+    if (empty(SHOW_BANNED) || !file_exists(SHOW_BANNED) || !is_executable(SHOW_BANNED)) {
+        error_log('SHOW_BANNED is not configured properly', 0);
+        return [];
+    }
+
+    $command = sprintf(
+        'sudo %s %s 2>&1',
+        escapeshellcmd(SHOW_BANNED),
+        escapeshellarg($server["ccd"])
+    );
+
+    exec($command, $banned_content, $return_var);
+    if ($return_var !== 0) {
+        error_log(sprintf(
+            'Command failed: %s (return code: %d)',
+            $command,
+            $return_var,
+        ), 0);
+        return [];
+    }
+
+    if (empty($banned_content)) { return []; }
+
+    $result = array_fill_keys($banned_content, true);
+    return $result;
+}
+
+function getClientIPsCCD($server) {
+    // Проверка входных параметров
+    if (empty($server["ccd"]) || !is_string($server["ccd"])) {
+        return [];
+    }
+
+    // Проверка существования исполняемого файла
+    if (empty(GET_IPS_FROM_CCD) || !file_exists(GET_IPS_FROM_CCD) || !is_executable(GET_IPS_FROM_CCD)) {
+        error_log('SHOW_BANNED is not configured properly', 0);
+        return [];
+    }
+
+    $command = sprintf(
+        'sudo %s %s 2>&1',
+        escapeshellcmd(GET_IPS_FROM_CCD),
+        escapeshellarg($server["ccd"])
+    );
+
+    exec($command, $ccd_content, $return_var);
+    if ($return_var !== 0) {
+        error_log(sprintf(
+            'Command failed: %s (return code: %d)',
+            $command,
+            $return_var,
+        ), 0);
+        return [];
+    }
+
+    if (empty($ccd_content)) { return []; }
+
+    $result=[];
+    foreach ($ccd_content as $line) {
+	if (empty($line)) { continue; }
+        list($login, $ip) = explode(' ', trim($line), 2);
+	$result[$login] = $ip;
+    }
+
+    return $result;
+}
+
+function getClientIPsIPP($server) {
+    // Проверка входных параметров
+    if (empty($server["ipp_file"]) || !is_string($server["ipp_file"])) {
+        return [];
+    }
+
+    // Проверка существования исполняемого файла
+    if (empty(GET_IPS_FROM_IPP) || !file_exists(GET_IPS_FROM_IPP) || !is_executable(GET_IPS_FROM_IPP)) {
+        error_log('SHOW_BANNED is not configured properly', 0);
+        return [];
+    }
+
+    $command = sprintf(
+        'sudo %s %s 2>&1',
+        escapeshellcmd(GET_IPS_FROM_IPP),
+        escapeshellarg($server["ipp_file"])
+    );
+
+    exec($command, $ipp_content, $return_var);
+    if ($return_var !== 0) {
+        error_log(sprintf(
+            'Command failed: %s (return code: %d)',
+            $command,
+            $return_var,
+        ), 0);
+        return [];
+    }
+
+    if (empty($ipp_content)) { return []; }
+
+    $result=[];
+    foreach ($ipp_content as $line) {
+	if (empty($line)) { continue; }
+        list($login, $ip) = explode(',', trim($line), 2);
+	$result[$login] = $ip;
+    }
+
+    return $result;
 }
 
 function getAccountList($server) {
     $accounts = [];
 
+    $banned = getBannedClients($server);
+
     // Получаем список из index.txt (неотозванные сертификаты)
     if (!empty($server['cert_index']) && !empty(SHOW_PKI_INDEX) && file_exists(SHOW_PKI_INDEX)) {
+	$servers_list = get_servers_crt($server['cert_index']);
         // Безопасное выполнение скрипта
-	$command = sprintf(
-	    'sudo %s %s 2>&1',
+        $command = sprintf(
+            'sudo %s %s 2>&1',
             escapeshellcmd(SHOW_PKI_INDEX),
             escapeshellarg($server['cert_index']),
         );
-	exec($command,  $index_content, $return_var);
+        exec($command,  $index_content, $return_var);
         if ($return_var == 0) {
             foreach ($index_content as $line) {
-	        if (empty(trim($line))) { continue; }
-		if (preg_match('/\/CN=([^\/]+)/', $line, $matches)) {
-		        $username = trim($matches[1]);
-			}
-		if (empty($username)) { continue; }
-		$revoked = false;
-		if (preg_match('/^R\s+/',$line)) { $revoked = true; }
-		$result = isServerCertificate($server['cert_index'], $username);
-		if (strpos($result, 'fail:') === 0) { continue; }
+                if (empty(trim($line))) { continue; }
+                if (preg_match('/\/CN=([^\/]+)/', $line, $matches)) {
+                        $username = trim($matches[1]);
+                        }
+                if (empty($username)) { continue; }
+                $revoked = false;
+                if (preg_match('/^R\s+/',$line)) { $revoked = true; }
+                if (isset($servers_list[$username])) { continue; }
                 $accounts[$username] = [
-	        	"username" => $username,
-	        	"ip" => null,
-        		"banned" => isClientBanned($server, $username) || $revoked,
-			"revoked" => $revoked
-        		];
-		}
-	    }
+                        "username" => $username,
+                        "ip" => null,
+                        "banned" => isset($banned[$username]) || $revoked,
+                        "revoked" => $revoked
+                        ];
+                }
+            }
     }
 
     // Получаем список выданных IP из ipp.txt
     if (!empty($server['ipp_file']) && file_exists($server['ipp_file'])) {
-        $ipp_content = file_get_contents($server['ipp_file']);
-        $lines = explode("\n", $ipp_content);
-
-        foreach ($lines as $line) {
-            if (empty(trim($line))) continue;
-
-            $parts = explode(',', $line);
-            if (count($parts) >= 2) {
-                $username = $parts[0];
-                $ip = $parts[1];
-                if (!isset($accounts[$username]) && empty($server['cert_index'])) {
+	$ipps = getClientIPsIPP($server);
+	foreach ($ipps as $username => $ip) {
+            if (!isset($accounts[$username]) && empty($server['cert_index'])) {
                     $accounts[$username] = [
                         "username" => $username,
-                        "banned" => isClientBanned($server, $username),
-			"ip" => $ip,
-			"revoked" => false,
+                        "banned" => isset($banned[$username]),
+                        "ip" => $ip,
+                        "revoked" => false,
                     ];
                 }
-                if (isset($accounts[$username]) and !empty($server['cert_index'])) {
-		    $accounts[$username]["ip"] = $ip;
-		}
-            }
+            if (isset($accounts[$username]) and !empty($server['cert_index'])) {
+                    $accounts[$username]["ip"] = $ip;
+                }
         }
     }
 
     // Ищем IP-адреса в CCD файлах
     if (!empty($server['ccd']) && is_dir($server['ccd'])) {
-        $ccd_files = scandir($server['ccd']);
-        foreach ($ccd_files as $file) {
-            if ($file === '.' || $file === '..') continue;
-            
-            $username = $file;
-            $filepath = $server['ccd'] . '/' . $file;
-            $content = file_get_contents($filepath);
-            
-            // Ищем строку ifconfig-push с IP адресом
-            if (preg_match('/ifconfig-push\s+(\d+\.\d+\.\d+\.\d+)/', $content, $matches)) {
-                $ip = $matches[1];
-                if (!isset($accounts[$username]) && empty($server['cert_index'])) {
+	$ccds = getClientIPsCCD($server);
+	foreach ($ccds as $username => $ip) {
+            if (!isset($accounts[$username]) && empty($server['cert_index'])) {
                     $accounts[$username] = [
                         "username" => $username,
-                        "banned" => isClientBanned($server, $username),
-			"ip" => $ip,
-			"revoked" => false,
+                        "banned" => isset($banned[$username]),
+                        "ip" => $ip,
+                        "revoked" => false,
                     ];
                 }
-                if (isset($accounts[$username]) and !empty($server['cert_index'])) {
-		    $accounts[$username]["ip"] = $ip;
-		}
-            }
+            if (isset($accounts[$username]) and !empty($server['cert_index'])) {
+                    $accounts[$username]["ip"] = $ip;
+                }
         }
     }
     return $accounts;
-}
-
-function isClientBanned($server, $client_name) {
-    $ccd_file = "{$server['ccd']}/$client_name";
-    return file_exists($ccd_file) && 
-           preg_match('/^disable$/m', file_get_contents($ccd_file));
 }
 
 function kickClient($server, $client_name) {
     return openvpnManagementCommand($server, "kill $client_name");
 }
 
-function banClient($server, $client_name) {
-    $ccd_file = "{$server['ccd']}/$client_name";
-    
-    // Добавляем директиву disable
-    $content = file_exists($ccd_file) ? file_get_contents($ccd_file) : '';
-    if (!preg_match('/^disable$/m', $content)) {
-        file_put_contents($ccd_file, $content . "\ndisable\n");
-    }
+function removeCCD($server, $client_name) {
+    if (empty($server["ccd"]) || empty($client_name) || empty(REMOVE_CCD) || !file_exists(REMOVE_CCD)) { return false; }
 
-    // Кикаем клиента
-    kickClient($server, $client_name);
-    return true;
+    $script_path = REMOVE_CCD;
+    $ccd_file = "{$server['ccd']}/$client_name";
+    $command = sprintf(
+        'sudo %s %s 2>&1',
+        escapeshellcmd($script_path),
+        escapeshellarg($ccd_file)
+    );
+    exec($command, $output, $return_var);
+
+    $_SESSION['last_request_time'] = [];
+
+    if ($return_var === 0) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+
+function unbanClient($server, $client_name) {
+    if (empty($server["ccd"]) || empty($client_name) || empty(BAN_CLIENT) || !file_exists(BAN_CLIENT)) { return false; }
+
+
+    $script_path = BAN_CLIENT;
+    $ccd_file = "{$server['ccd']}/$client_name";
+    $command = sprintf(
+        'sudo %s %s unban 2>&1',
+        escapeshellcmd($script_path),
+        escapeshellarg($ccd_file)
+    );
+    exec($command, $output, $return_var);
+
+    $_SESSION['last_request_time'] = [];
+
+    if ($return_var === 0) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+function banClient($server, $client_name) {
+    if (empty($server["ccd"]) || empty($client_name) || empty(BAN_CLIENT) || !file_exists(BAN_CLIENT)) { return false; }
+
+    $script_path = BAN_CLIENT;
+    $ccd_file = "{$server['ccd']}/$client_name";
+    $command = sprintf(
+        'sudo %s %s ban 2>&1',
+        escapeshellcmd($script_path),
+        escapeshellarg($ccd_file)
+    );
+    exec($command, $output, $return_var);
+
+    $_SESSION['last_request_time'] = [];
+
+    if ($return_var === 0) {
+        // Кикаем клиента
+	kickClient($server, $client_name);
+        return true;
+    } else {
+        return false;
+    }
 }
 
 function revokeClient($server, $client_name) {
     if (empty(REVOKE_CRT) || !file_exists(REVOKE_CRT)) {
-	return banClient($server, $client_name);
-	}
+        return banClient($server, $client_name);
+        }
 
     $script_path = REVOKE_CRT;
     $rsa_dir = dirname(dirname($server['cert_index']));
 
     $command = sprintf(
         'sudo %s %s %s %s 2>&1',
-	escapeshellcmd($script_path),
+        escapeshellcmd($script_path),
         escapeshellarg('openvpn-server@'.$server['name']),
         escapeshellarg($rsa_dir),
         escapeshellarg($client_name)
@@ -315,22 +451,12 @@ function revokeClient($server, $client_name) {
     exec($command, $output, $return_var);
 
     if ($return_var === 0) {
-	return true;
+        return true;
     } else {
-	return false;
+        return false;
     }
 }
 
-function unbanClient($server, $client_name) {
-    $ccd_file = "{$server['ccd']}/$client_name";
-    if (file_exists($ccd_file)) {
-        $content = file_get_contents($ccd_file);
-        $new_content = preg_replace('/^disable$\n?/m', '', $content);
-        file_put_contents($ccd_file, $new_content);
-        return true;
-    }
-    return false;
-}
 
 function formatBytes($bytes) {
     $bytes = (int)$bytes;
@@ -338,23 +464,6 @@ function formatBytes($bytes) {
     $units = ['B', 'KB', 'MB', 'GB', 'TB'];
     $pow = floor(log($bytes)/log(1024));
     return round($bytes/pow(1024,$pow),2).' '.$units[$pow];
-}
-
-function getBannedClients($server, $active_clients) {
-    $banned = [];
-    $active_names = array_column($active_clients, 'name');
-    
-    if (is_dir($server['ccd'])) {
-        foreach (scandir($server['ccd']) as $file) {
-            if ($file !== '.' && $file !== '..' && is_file("{$server['ccd']}/$file")) {
-                if (isClientBanned($server, $file) && !in_array($file, $active_names)) {
-                    $banned[] = $file;
-                }
-            }
-        }
-    }
-    
-    return $banned;
 }
 
 function isClientActive($active_clients,$username) {

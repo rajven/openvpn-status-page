@@ -5,7 +5,7 @@ set -o nounset
 set -o pipefail
 
 show_usage() {
-    echo "Usage: $0 [path_to_index.txt]"
+    echo "Usage: $0 <index.txt>"
     echo "Default index_txt: /etc/openvpn/server/server/rsa/pki/index.txt"
     exit 1
 }
@@ -41,10 +41,18 @@ main() {
 
     validate_pki_dir "${PKI_DIR}"
 
-    index_txt="${PKI_DIR}/index.txt"
-
-    [ -e "${index_txt}" ] && cat "${index_txt}" || exit 1
-
+    find "${PKI_DIR}/issued/" \( -name "*.crt" -o -name "*.pem" -o -name "*.cer" \) -print0 | while IFS= read -r -d '' cert; do
+        # Одновременно получаем subject и проверяем расширения
+	openssl_output=$(openssl x509 -in "$cert" -subject -noout -ext extendedKeyUsage -purpose 2>/dev/null)
+        username=$(basename "${cert}" | sed 's/\.[^.]*$//')
+	CN=$(echo "$openssl_output" | grep 'subject=' | sed 's/.*CN=//;s/,.*//')
+        # Проверяем расширения из одного вывода openssl
+	if echo "$openssl_output" | grep -q "TLS Web Server Authentication\|serverAuth" || 
+    	    echo "$openssl_output" | grep -q "SSL server : Yes"; then
+            echo "$username"
+	    [ "${username}" != "${CN}" ] && echo "$CN"
+	    fi
+    done
 }
 
 main "$@"

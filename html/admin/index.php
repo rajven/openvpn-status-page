@@ -275,11 +275,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             color: #999;
             font-style: italic;
         }
-        
         .revoke-btn {
             background-color: #ff9999;
         }
         .revoke-btn:hover {
+            background-color: #e65c00;
+        }
+
+        .remove-text {
+            color: #999;
+            font-style: italic;
+        }
+        .remove-btn {
+            background-color: #ff9999;
+        }
+        .remove-btn:hover {
             background-color: #e65c00;
         }
 
@@ -434,28 +444,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 username: username,
                 csrf: csrf
             });
-            
-            // Вариант 1: Простое открытие (рекомендуется)
+
             window.open(`?${params.toString()}`, '_blank');
             document.body.removeChild(spinner);
-            
-            /* 
-            // Вариант 2: Через fetch (если нужно строго AJAX)
-            fetch(`?${params.toString()}`, {
-                headers: {'X-Requested-With': 'XMLHttpRequest'}
-            })
-            .then(response => response.blob())
-            .then(blob => {
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `${username}.ovpn`;
-                a.click();
-                URL.revokeObjectURL(url);
-            })
-            .catch(console.error)
-            .finally(() => document.body.removeChild(spinner));
-            */
             
             return false;
         }
@@ -559,6 +550,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     message = `WARNING: Revoke certificate for ${username}?\n\nThis action is irreversible and will permanently disable the certificate!`;
                     isDangerous = true;
                     break;
+                case 'remove':
+                    message = `Remove user ${username} config file?`;
+                    break;
                 default:
                     message = `Perform ${action} on ${username}?`;
             }
@@ -577,6 +571,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             return false;
         }
     </script>
+
+&copy; 2024–<?= date('Y') ?> — OpenVPN Status Monitoring.  
+Based on <a href="https://github.com/rajven/openvpn-status-page" target="_blank">openvpn-status-page</a> by rajven. All rights reserved.
 
 </body>
 </html>

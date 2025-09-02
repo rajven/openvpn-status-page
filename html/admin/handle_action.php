@@ -41,6 +41,9 @@ try {
         case 'unban':
             $result = unbanClient($server, $client_name);
             break;
+        case 'remove':
+            $result = removeCCD($server, $client_name);
+            break;
         default:
             throw new Exception('Invalid action');
     }
@@ -49,3 +52,7 @@ try {
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);
 }
+
+$clean_url = strtok($_SERVER['REQUEST_URI'], '?');
+header("Refresh:0; url=" . $clean_url);
+exit;
