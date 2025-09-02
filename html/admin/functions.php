@@ -13,6 +13,9 @@ function updateLastRequestTime($server) {
 }
 
 function openvpnManagementCommand($server, $command) {
+
+    if (empty($server['host']) || empty($server['port']) || empty($server['password'])) { return false; }
+
     $mgmt_host = $server['host'];
     $mgmt_port = $server['port'];
     $mgmt_pass = $server['password'];
