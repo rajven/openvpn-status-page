@@ -51,6 +51,8 @@ main() {
 
     #get banned
     egrep "^disable$" -R "${ccd_dir}"/* | sed 's#.*/##; s/:.*//'
+
+    exit 0
 }
 
 main "$@"

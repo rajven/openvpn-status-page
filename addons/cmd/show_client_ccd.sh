@@ -52,6 +52,7 @@ main() {
     #get client ips
     egrep "^ifconfig-push\s+" "${ccd_dir}"/* | sed 's|.*/||; s/:ifconfig-push / /; s/\([^ ]* [^ ]*\).*/\1/'
 
+    exit 0
 }
 
 main "$@"

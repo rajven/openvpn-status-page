@@ -56,6 +56,8 @@ main() {
 
     #remove file
     rm -f "${ccd_file}"
+
+    exit 0
 }
 
 main "$@"

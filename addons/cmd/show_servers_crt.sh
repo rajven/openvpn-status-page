@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -o errexit
-set -o nounset
 set -o pipefail
 
 show_usage() {
@@ -47,12 +45,15 @@ main() {
         username=$(basename "${cert}" | sed 's/\.[^.]*$//')
 	CN=$(echo "$openssl_output" | grep 'subject=' | sed 's/.*CN=//;s/,.*//')
         # Проверяем расширения из одного вывода openssl
-	if echo "$openssl_output" | grep -q "TLS Web Server Authentication\|serverAuth" || 
-    	    echo "$openssl_output" | grep -q "SSL server : Yes"; then
+#	if echo "$openssl_output" | grep -q "TLS Web Server Authentication\|serverAuth" ||
+#    	    echo "$openssl_output" | grep -q "SSL server : Yes"; then
+	if echo "$openssl_output" | grep -q "TLS Web Server Authentication\|serverAuth"; then
+
             echo "$username"
 	    [ "${username}" != "${CN}" ] && echo "$CN"
 	    fi
     done
+    exit 0
 }
 
 main "$@"

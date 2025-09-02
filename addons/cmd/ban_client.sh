@@ -97,6 +97,8 @@ main() {
             show_usage
             ;;
     esac
+
+    exit 0
 }
 
 main "$@"

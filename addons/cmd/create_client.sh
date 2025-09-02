@@ -58,3 +58,5 @@ else
     echo "Failed to create user $USERNAME"
     exit 1
 fi
+
+exit 0

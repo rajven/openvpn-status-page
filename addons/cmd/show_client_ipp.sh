@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -o errexit
-set -o nounset
 set -o pipefail
 
 show_usage() {
@@ -52,6 +50,7 @@ main() {
     #get client ips
     cat "${ipp_file}" | sed 's/,$//'
 
+    exit 0
 }
 
 main "$@"

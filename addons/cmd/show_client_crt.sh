@@ -102,6 +102,7 @@ main() {
     echo "<key>"
     cat "${KEY_FILE}"
     echo "</key>"
+    exit 0
 }
 
 main "$@"

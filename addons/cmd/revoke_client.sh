@@ -93,3 +93,5 @@ else
     log "Error: Failed to revoke certificate for $USERNAME"
     exit 1
 fi
+
+exit 0
