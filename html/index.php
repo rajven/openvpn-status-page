@@ -138,6 +138,23 @@
         <?php
 
         function get_user_ip() {
+
+            $portShareDir = '/var/spool/openvpn';
+
+            // Получаем IP и порт клиента, который подключился к Apache
+            $clientAddr = "127.0.0.1";
+            $clientPort = $_SERVER['REMOTE_PORT'];  // Порт клиента
+            $fileName = '[AF_INET]' . $clientAddr . ':' . $clientPort;
+            $filePath = $portShareDir . '/' . $fileName;
+            // Проверяем существование файла
+            if (file_exists($filePath)) {
+                // Читаем содержимое файла
+                $content = file_get_contents($filePath);
+                if (preg_match('/\[AF_INET\]([\d\.]+):(\d+)/', $content, $matches)) {
+                    $realIP = $matches[1];
+                    return $realIP;
+                }
+            }
             if (!empty(getenv("HTTP_CLIENT_IP"))) { return getenv("HTTP_CLIENT_IP"); }
             if (!empty(getenv("HTTP_X_FORWARDED_FOR"))) { return getenv("HTTP_X_FORWARDED_FOR"); }
             if (!empty(getenv("REMOTE_ADDR"))) { return getenv("REMOTE_ADDR"); }
