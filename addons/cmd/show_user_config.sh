@@ -18,11 +18,14 @@ main() {
     [[ $# -lt 1 ]] && show_usage
 
     local ccd_file=$1
+    local ccd_dir=$(dirname $ccd_file)
 
     # Validate CCD directory path
-    check_ccd_path "$ccd_file"
+    check_ccd_path "$ccd_dir"
 
-    cat "${ccd_file}"
+    if [ -e "$ccd_file" ]; then
+        cat "${ccd_file}"
+        fi
 
     exit 0
 }
