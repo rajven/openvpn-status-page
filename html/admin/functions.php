@@ -143,8 +143,13 @@ function get_servers_crt($cert_index) {
         return false;
     }
 
-    // Проверка существования исполняемого файла
-    if (empty(SHOW_SERVERS_CRT) || !file_exists(SHOW_SERVERS_CRT) || !is_executable(SHOW_SERVERS_CRT)) {
+//    // Проверка существования исполняемого файла
+//    if (empty(SHOW_SERVERS_CRT) || !file_exists(SHOW_SERVERS_CRT) || !is_executable(SHOW_SERVERS_CRT)) {
+//        error_log('SHOW_SERVERS_CRT is not configured properly', 0);
+//        return false;
+//    }
+
+    if (empty(SHOW_SERVERS_CRT)) {
         error_log('SHOW_SERVERS_CRT is not configured properly', 0);
         return false;
     }
@@ -183,8 +188,13 @@ function getBannedClients($server) {
         return [];
     }
 
-    // Проверка существования исполняемого файла
-    if (empty(SHOW_BANNED) || !file_exists(SHOW_BANNED) || !is_executable(SHOW_BANNED)) {
+//    // Проверка существования исполняемого файла
+//    if (empty(SHOW_BANNED) || !file_exists(SHOW_BANNED) || !is_executable(SHOW_BANNED)) {
+//        error_log('SHOW_BANNED is not configured properly', 0);
+//        return [];
+//    }
+
+    if (empty(SHOW_BANNED)) {
         error_log('SHOW_BANNED is not configured properly', 0);
         return [];
     }
@@ -217,8 +227,13 @@ function getClientIPsCCD($server) {
         return [];
     }
 
-    // Проверка существования исполняемого файла
-    if (empty(GET_IPS_FROM_CCD) || !file_exists(GET_IPS_FROM_CCD) || !is_executable(GET_IPS_FROM_CCD)) {
+//    // Проверка существования исполняемого файла
+//    if (empty(GET_IPS_FROM_CCD) || !file_exists(GET_IPS_FROM_CCD) || !is_executable(GET_IPS_FROM_CCD)) {
+//        error_log('SHOW_BANNED is not configured properly', 0);
+//        return [];
+//    }
+
+    if (empty(GET_IPS_FROM_CCD)) {
         error_log('SHOW_BANNED is not configured properly', 0);
         return [];
     }
@@ -257,8 +272,13 @@ function getClientIPsIPP($server) {
         return [];
     }
 
-    // Проверка существования исполняемого файла
-    if (empty(GET_IPS_FROM_IPP) || !file_exists(GET_IPS_FROM_IPP) || !is_executable(GET_IPS_FROM_IPP)) {
+//    // Проверка существования исполняемого файла
+//    if (empty(GET_IPS_FROM_IPP) || !file_exists(GET_IPS_FROM_IPP) || !is_executable(GET_IPS_FROM_IPP)) {
+//        error_log('SHOW_BANNED is not configured properly', 0);
+//        return [];
+//    }
+
+    if (empty(GET_IPS_FROM_IPP)) {
         error_log('SHOW_BANNED is not configured properly', 0);
         return [];
     }
@@ -297,7 +317,8 @@ function getAccountList($server) {
     $banned = getBannedClients($server);
 
     // Получаем список из index.txt (неотозванные сертификаты)
-    if (!empty($server['cert_index']) && !empty(SHOW_PKI_INDEX) && file_exists(SHOW_PKI_INDEX)) {
+//    if (!empty($server['cert_index']) && !empty(SHOW_PKI_INDEX) && file_exists(SHOW_PKI_INDEX)) {
+    if (!empty($server['cert_index']) && !empty(SHOW_PKI_INDEX)) {
 	$servers_list = get_servers_crt($server['cert_index']);
         // Безопасное выполнение скрипта
         $command = sprintf(
@@ -327,7 +348,8 @@ function getAccountList($server) {
     }
 
     // Получаем список выданных IP из ipp.txt
-    if (!empty($server['ipp_file']) && file_exists($server['ipp_file'])) {
+//    if (!empty($server['ipp_file']) && file_exists($server['ipp_file'])) {
+    if (!empty($server['ipp_file'])) {
 	$ipps = getClientIPsIPP($server);
 	foreach ($ipps as $username => $ip) {
             if (!isset($accounts[$username]) && empty($server['cert_index'])) {
@@ -369,7 +391,8 @@ function kickClient($server, $client_name) {
 }
 
 function removeCCD($server, $client_name) {
-    if (empty($server["ccd"]) || empty($client_name) || empty(REMOVE_CCD) || !file_exists(REMOVE_CCD)) { return false; }
+//    if (empty($server["ccd"]) || empty($client_name) || empty(REMOVE_CCD) || !file_exists(REMOVE_CCD)) { return false; }
+    if (empty($server["ccd"]) || empty($client_name) || empty(REMOVE_CCD)) { return false; }
 
     $script_path = REMOVE_CCD;
     $ccd_file = "{$server['ccd']}/$client_name";
@@ -391,7 +414,8 @@ function removeCCD($server, $client_name) {
 
 
 function unbanClient($server, $client_name) {
-    if (empty($server["ccd"]) || empty($client_name) || empty(BAN_CLIENT) || !file_exists(BAN_CLIENT)) { return false; }
+//    if (empty($server["ccd"]) || empty($client_name) || empty(BAN_CLIENT) || !file_exists(BAN_CLIENT)) { return false; }
+    if (empty($server["ccd"]) || empty($client_name) || empty(BAN_CLIENT)) { return false; }
 
 
     $script_path = BAN_CLIENT;
@@ -413,7 +437,8 @@ function unbanClient($server, $client_name) {
 }
 
 function banClient($server, $client_name) {
-    if (empty($server["ccd"]) || empty($client_name) || empty(BAN_CLIENT) || !file_exists(BAN_CLIENT)) { return false; }
+//    if (empty($server["ccd"]) || empty($client_name) || empty(BAN_CLIENT) || !file_exists(BAN_CLIENT)) { return false; }
+    if (empty($server["ccd"]) || empty($client_name) || empty(BAN_CLIENT)) { return false; }
 
     $script_path = BAN_CLIENT;
     $ccd_file = "{$server['ccd']}/$client_name";
@@ -436,7 +461,8 @@ function banClient($server, $client_name) {
 }
 
 function revokeClient($server, $client_name) {
-    if (empty(REVOKE_CRT) || !file_exists(REVOKE_CRT)) {
+//    if (empty(REVOKE_CRT) || !file_exists(REVOKE_CRT)) {
+    if (empty(REVOKE_CRT)) {
         return banClient($server, $client_name);
         }
 

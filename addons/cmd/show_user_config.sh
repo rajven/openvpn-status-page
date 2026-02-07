@@ -1,14 +1,12 @@
 #!/bin/bash
 
-set -o pipefail
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 #SCRIPT_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
 source "$SCRIPT_DIR/functions.sh"
 
 show_usage() {
-    echo "Usage: $0 <ipp_file>"
-    echo "Example: $0 /etc/openvpn/server/server/ipp.txt"
+    echo "Usage: $0 <fullpath_user_ccd_file>"
+    echo "Example: $0 /etc/openvpn/server/server/ccd/user1"
     exit 1
 }
 
@@ -19,13 +17,12 @@ main() {
     # Process arguments
     [[ $# -lt 1 ]] && show_usage
 
-    local ipp_file=$1
+    local ccd_file=$1
 
-    # Validate CCD file path
-    check_ccd_path "$ipp_file"
+    # Validate CCD directory path
+    check_ccd_path "$ccd_file"
 
-    # Get client IPs (remove trailing commas)
-    sed 's/,$//' "$ipp_file"
+    cat "${ccd_file}"
 
     exit 0
 }

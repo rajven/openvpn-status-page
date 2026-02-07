@@ -4,10 +4,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-log() {
-    logger -t "openvpn-ban" -p user.info "$1"
-    echo "$1"  # Также выводим в консоль для обратной связи
-}
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+#SCRIPT_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
+source "$SCRIPT_DIR/functions.sh"
 
 show_usage() {
     echo "Usage: $0 <ccd_file> <ban|unban>"
@@ -15,69 +14,36 @@ show_usage() {
     exit 1
 }
 
-# Проверка прав
-check_permissions() {
-    if [[ $EUID -ne 0 ]]; then
-        log "Error: This script must be run as root" >&2
-        exit 1
-    fi
-}
-
-# Проверка что CCD файл находится в правильном пути
-check_ccd_path() {
-    local ccd_file=$1
-    local expected_path="/etc/openvpn/server"
-    
-    # Проверяем что путь начинается с /etc/openvpn/server/
-    if [[ ! "$ccd_file" =~ ^$expected_path/ ]]; then
-        log "Error: CCD file must be located under $expected_path/"
-        log "Provided path: $ccd_file"
-        exit 1
-    fi
-    
-    # Дополнительная проверка: файл должен существовать
-    if [[ ! -f "$ccd_file" ]]; then
-        log "Error: CCD file does not exist: $ccd_file"
-        exit 1
-    fi
-    
-    # Проверка прав на запись
-    if [[ ! -w "$ccd_file" ]]; then
-        log "Error: No write permission for CCD file: $ccd_file"
-        exit 1
-    fi
-}
-
 main() {
-    # Проверка прав
+    # Check permissions
     check_permissions
 
-    # Обработка аргументов
+    # Process arguments
     [[ $# -lt 2 ]] && show_usage
 
     local ccd_file=$1
     local action=$2
-    
-    # Проверка пути CCD файла
+
+    # Validate CCD file path
     check_ccd_path "$ccd_file"
 
-    local username=$(basename "${ccd_file}")
+    local username
+    username=$(basename "${ccd_file}")
 
     touch "${ccd_file}"
-    chmod 640 "${ccd_file}"
-    chown nobody:nogroup "${ccd_file}"
+    chmod 660 "${ccd_file}"
+    chown ${owner_user}:${owner_group} "${ccd_file}"
 
+    local is_banned=""
     if grep -q "^disable$" "$ccd_file"; then
         is_banned="disable"
-    else
-        is_banned=""
     fi
 
     case "$action" in
         ban)
             if [[ -z "$is_banned" ]]; then
                 log "Ban user: ${username}"
-		sed -i '1i\disable' "${ccd_file}"
+                sed -i '1i\disable' "${ccd_file}"
                 log "User ${username} banned successfully"
             else
                 log "User ${username} is already banned"
@@ -85,7 +51,7 @@ main() {
             ;;
         unban)
             if [[ -n "$is_banned" ]]; then
-                log "UnBan user: ${username}"
+                log "Unban user: ${username}"
                 sed -i '/^disable$/d' "${ccd_file}"
                 log "User ${username} unbanned successfully"
             else
@@ -93,7 +59,7 @@ main() {
             fi
             ;;
         *)
-            log "Error: Invalid action. Use 'ban' or 'unban'" >&2
+            log "Error: Invalid action. Use 'ban' or 'unban'"
             show_usage
             ;;
     esac

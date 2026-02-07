@@ -92,7 +92,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'generate_config') {
     }
 
 // Обработка создания пользователя
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'create_user' && !empty(CREATE_CRT) && file_exists(CREATE_CRT)) {
+//if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'create_user' && !empty(CREATE_CRT) && file_exists(CREATE_CRT)) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'create_user' && !empty(CREATE_CRT)) {
     // Проверка CSRF
 /*    if (empty($_POST['csrf']) || $_POST['csrf'] !== $_SESSION['csrf_token']) {
         header('HTTP/1.0 403 Forbidden');
@@ -135,7 +136,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
     exit;
 }
+
 ?>
+
 
 <!DOCTYPE html>
 <html>
@@ -339,6 +342,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         </div>
         <?php endforeach; ?>
     </div>
+
+<script>
+function editCCD(server, username) {
+    const width = 800;
+    const height = 600;
+    const left = (screen.width/2) - (width/2);
+    const top  = (screen.height/2) - (height/2);
+
+    const win = window.open('', 'editCCD', `width=${width},height=${height},top=${top},left=${left},resizable=yes,scrollbars=yes`);
+
+    win.document.write('<h3>Edit CCD for ' + username + ' on ' + server + '</h3>');
+    win.document.write('<textarea id="ccd-textarea" style="width:100%; height:80%; font-family: monospace;">Loading...</textarea><br>');
+    win.document.write('<button onclick="saveCCD()">Save</button> <span id="save-status"></span>');
+
+    // Функция для сохранения
+    win.saveCCD = function() {
+        const textarea = win.document.getElementById('ccd-textarea');
+        const status = win.document.getElementById('save-status');
+        status.textContent = 'Saving...';
+
+        fetch('save_user_config.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({
+                server: server,
+                username: username,
+                config: textarea.value
+            })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                status.textContent = 'Saved ✅';
+                setTimeout(() => win.close(), 1000); // закрываем окно через секунду
+            } else {
+                status.textContent = 'Error: ' + (data.message || 'Unknown');
+            }
+        })
+        .catch(err => {
+            status.textContent = 'Request failed: ' + err.message;
+        });
+    };
+
+    // Загружаем текущее содержимое CCD
+    fetch(`get_user_config.php?server=${encodeURIComponent(server)}&username=${encodeURIComponent(username)}`, {
+        headers: {'X-Requested-With': 'XMLHttpRequest'}
+    })
+    .then(r => r.text())
+    .then(data => { win.document.getElementById('ccd-textarea').value = data; })
+    .catch(err => { win.document.getElementById('ccd-textarea').value = 'Error loading: ' + err.message; });
+}
+</script>
+
 
     <script>
         // Функция для загрузки данных сервера

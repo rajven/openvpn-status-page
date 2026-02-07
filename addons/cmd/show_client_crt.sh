@@ -4,97 +4,47 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+#SCRIPT_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
+source "$SCRIPT_DIR/functions.sh"
+
 show_usage() {
     echo "Usage: $0 <login> [pki_dir]"
     echo "Default pki_dir: /etc/openvpn/server/server/rsa/pki"
     exit 1
 }
 
-log() {
-    logger -t "openvpn-www" -p user.info "$1"
-    echo "$1"  # Также выводим в консоль для обратной связи
-}
-
-# Проверка прав
-check_permissions() {
-    if [[ $EUID -ne 0 ]]; then
-        log "Error: This script must be run as root" >&2
-        exit 1
-    fi
-}
-
-validate_pki_dir() {
-    local pki_dir=$1
-    if [[ ! -d "${pki_dir}" || ! -f "${pki_dir}/index.txt" ]]; then
-        log "Error: Invalid PKI directory - missing index.txt"
-        exit 2
-    fi
-}
-
-find_cert_file() {
-    local cn=$1 pki_dir=$2
-    local cert_file
-    
-    # Try standard location first
-    cert_file="${pki_dir}/issued/${cn}.crt"
-    [[ -f "${cert_file}" ]] && echo "${cert_file}" && return 0
-    
-    # Fallback to serial-based lookup
-    local serial
-    serial=$(awk -v cn="${cn}" '$0 ~ "/CN=" cn "/" && $1 == "V" {print $3}' "${pki_dir}/index.txt")
-    [[ -z "${serial}" ]] && return 1
-    
-    cert_file="${pki_dir}/certs_by_serial/${serial}.pem"
-    [[ -f "${cert_file}" ]] && echo "${cert_file}" && return 0
-    
-    return 1
-}
-
-find_key_file() {
-    local cn=$1 pki_dir=$2 serial=$3
-    local key_file
-    
-    # Try standard locations
-    for candidate in "${pki_dir}/private/${cn}.key" "${pki_dir}/private/${serial}.key"; do
-        if [[ -f "${candidate}" ]]; then
-            echo "${candidate}"
-            return 0
-        fi
-    done
-    
-    return 1
-}
-
 main() {
-    # Argument handling
+    # Process arguments
     [[ $# -lt 1 ]] && show_usage
-    
+
     check_permissions
 
     local CN=$1
     local PKI_DIR=${2:-/etc/openvpn/server/server/rsa/pki}
-    
+
+    # Validate PKI directory
     validate_pki_dir "${PKI_DIR}"
-    
-    # Find certificate
+
+    # Find certificate file
     local CERT_FILE
     CERT_FILE=$(find_cert_file "${CN}" "${PKI_DIR}") || {
         log "Error: Certificate for CN=${CN} not found"
         exit 3
     }
-    
-    # Find serial number for key lookup
+
+    # Extract serial number for key lookup
     local SERIAL
     SERIAL=$(openssl x509 -in "${CERT_FILE}" -noout -serial | cut -d= -f2)
-    
-    # Find private key
+
+    # Find private key file
     local KEY_FILE
     KEY_FILE=$(find_key_file "${CN}" "${PKI_DIR}" "${SERIAL}") || {
         log "Error: Private key for CN=${CN} not found"
         exit 4
     }
-    
-    # Output results
+
+    # Output results in XML-like format
     echo "<cert>"
     openssl x509 -in "${CERT_FILE}"
     echo "</cert>"
@@ -102,6 +52,7 @@ main() {
     echo "<key>"
     cat "${KEY_FILE}"
     echo "</key>"
+
     exit 0
 }
 

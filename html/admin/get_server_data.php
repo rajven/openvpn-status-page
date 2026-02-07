@@ -48,7 +48,6 @@ ob_start();
 ?>
 <h2><?= htmlspecialchars($server['title']) ?></h2>
 
-
 <div class="section">
     <h3>Active Connections</h3>
     <?php if (!empty($clients)): ?>
@@ -95,6 +94,7 @@ ob_start();
                         <button onclick="handleAction('<?= $server_name ?>', 'revoke', '<?= htmlspecialchars($client['name']) ?>')" 
                 	        class="btn ban-btn">Revoke</button>
                     <?php endif; ?>
+		    <button class="btn" onclick="editCCD('<?= $server_name ?>','<?= $client['name'] ?>')">Edit CCD</button>
                 </td>
             </tr>
             <?php endforeach; ?>
@@ -161,6 +161,7 @@ ob_start();
 			        <button onclick="return confirmAction('remove', '<?= htmlspecialchars($account['username']) ?>', '<?= $server_name ?>', event)"
                                         class="btn remove-btn">Remove CCD</button>
                                 <?php endif; ?>
+				    <button class="btn" onclick="editCCD('<?= $server_name ?>','<?= $account['username'] ?>')">Edit CCD</button>
                             <?php endif; ?>
                         </td>
                     </tr>
