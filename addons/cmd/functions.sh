@@ -88,4 +88,4 @@ find_key_file() {
     return 1
 }
 
-mlog "Script called with: $0 $@"
+#mlog "Script called with: $0 $@"
