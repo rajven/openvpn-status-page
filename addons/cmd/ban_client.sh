@@ -43,7 +43,7 @@ main() {
         ban)
             if [[ -z "$is_banned" ]]; then
                 log "Ban user: ${username}"
-                sed -i '1i\disable' "${ccd_file}"
+                echo -e "disable\n$(cat "$ccd_file")" > "$ccd_file"
                 log "User ${username} banned successfully"
             else
                 log "User ${username} is already banned"
@@ -54,6 +54,11 @@ main() {
                 log "Unban user: ${username}"
                 sed -i '/^disable$/d' "${ccd_file}"
                 log "User ${username} unbanned successfully"
+                # if the file is empty or only blank lines, we erase it.
+                if [[ ! -s "${ccd_file}" ]] || ! grep -q '[^[:space:]]' "${ccd_file}"; then
+                    log "CCD file ${ccd_file} is empty after unban, removing"
+                    rm -f "${ccd_file}"
+                fi
             else
                 log "User ${username} is not banned"
             fi

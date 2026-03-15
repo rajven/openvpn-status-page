@@ -1,7 +1,7 @@
 #!/bin/bash
 
 owner_user=nobody
-owner_group=www-data
+owner_group=nogroup
 
 # Name of the current script (without path)
 script_name="$(basename "${BASH_SOURCE[0]}")"
@@ -39,10 +39,6 @@ check_ccd_path() {
             log "Error: No write permission for file: $path"
             exit 1
         fi
-    else
-        # Path does not exist or is not a regular file/directory
-        log "Error: Path does not exist or is not a file/directory: $path"
-        exit 1
     fi
 }
 
