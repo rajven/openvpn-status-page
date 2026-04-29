@@ -4,8 +4,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 #SCRIPT_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
 source "$SCRIPT_DIR/functions.sh"
 
-if [ "$#" -ne 2 ]; then
-    echo "Usage: $0 <rsa_dir> <username>"
+if [ "$#" -lt 2 ]; then
+    echo "Usage: $0 <rsa_dir> <username> [--force]"
     exit 1
 fi
 
@@ -26,10 +26,44 @@ if [ ! -f "$RSA_DIR/easyrsa" ]; then
     exit 1
 fi
 
+FORCE=0
+if [ "$3" == "--force" ]; then
+    FORCE=1
+fi
+
 # Check whether the user already exists
 if [ -f "$RSA_DIR/pki/index.txt" ] && grep -q "CN=$USERNAME" "$RSA_DIR/pki/index.txt"; then
-    log "User $USERNAME already exists"
-    exit 1
+    if [ $FORCE -eq 1 ]; then
+        log "User $USERNAME exists, revoking and recreating..."
+        cd "$RSA_DIR" || exit 1
+        ./easyrsa --batch revoke "$USERNAME"
+        ./easyrsa --batch gen-crl
+
+        log "Removing old certificate files for $USERNAME..."
+
+        if [ -f "$RSA_DIR/pki/issued/${USERNAME}.crt" ]; then
+            rm -f "$RSA_DIR/pki/issued/${USERNAME}.crt"
+            log "Removed: $RSA_DIR/pki/issued/${USERNAME}.crt"
+        fi
+
+        if [ -f "$RSA_DIR/pki/private/${USERNAME}.key" ]; then
+            rm -f "$RSA_DIR/pki/private/${USERNAME}.key"
+            log "Removed: $RSA_DIR/pki/private/${USERNAME}.key"
+        fi
+
+        if [ -f "$RSA_DIR/pki/reqs/${USERNAME}.req" ]; then
+            rm -f "$RSA_DIR/pki/reqs/${USERNAME}.req"
+            log "Removed: $RSA_DIR/pki/reqs/${USERNAME}.req"
+        fi
+
+        if [ -f "$RSA_DIR/pki/inline/${USERNAME}.inline" ]; then
+            rm -f "$RSA_DIR/pki/inline/${USERNAME}.inline"
+            log "Removed: $RSA_DIR/pki/inline/${USERNAME}.inline"
+        fi
+    else
+        log "User $USERNAME already exists (use --force to renew)"
+        exit 1
+    fi
 fi
 
 # Change to the PKI directory and create the client

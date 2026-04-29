@@ -117,6 +117,7 @@ ob_start();
                         <th>Account</th>
                         <th>Assigned IP</th>
                         <th>Status</th>
+                        <th>Cert</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -134,19 +135,47 @@ ob_start();
                         <?php
                         $is_revoked = $account['revoked'];
                         $is_banned = $account['banned'];
-                        $status_class = $is_revoked ? 'status-banned' : ($is_banned ? 'status-banned' : 'status-active');
-                        $status_text = $is_revoked ? 'REVOKED' : ($is_banned ? 'BANNED' : 'ENABLED');
-                        ?>
-                        
+			$status_class = $is_revoked ? 'status-banned' : ($is_banned ? 'status-banned' : 'status-active');
+			$status_text = $is_revoked ? 'REVOKED' : ($is_banned ? 'BANNED' : 'ENABLED');
+			?>
+
+			<td>
+			    <span class="status-badge <?= $status_class ?>">
+			        <?= htmlspecialchars($status_text) ?>
+			    </span>
+			</td>
+
                         <td>
-                            <span class="status-badge <?= $status_class ?>">
-                                <?= $status_text ?>
-                            </span>
+                                <?php if (isset($account['cert_date']) && $account['cert_date'] !== '-'): ?>
+                                    <div class="cert-info">
+                                        <span class="cert-date 
+                                            <?= $account['expired'] ? 'expired' : ($account['days_left'] < 7 ? 'expiring-soon' : 'valid') ?>">
+                                            <?= htmlspecialchars($account['cert_date']) ?>
+                                        </span>
+                                        <?php if ($account['days_left'] !== null): ?>
+                                            <span class="cert-days 
+                                                <?= $account['expired'] ? 'expired' : ($account['days_left'] < 7 ? 'urgent' : ($account['days_left'] < 30 ? 'warning' : '')) ?>">
+                                                <?php if ($account['expired']): ?>
+                                                    (expired <?= $account['days_left'] ?>d ago)
+                                                <?php else: ?>
+                                                    (<?= $account['days_left'] ?>d left)
+                                                <?php endif; ?>
+                                            </span>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php else: ?>
+                                    <span class="cert-date error">No certificate</span>
+                                <?php endif; ?>
                         </td>
+
                         <td class="actions">
                             <?php if ($is_revoked): ?>
                                 <span class="revoked-text">Certificate revoked</span>
                             <?php else: ?>
+			        <?php if (!$cert_info['valid']): ?>
+		        	    <button onclick="return confirmAction('renew', '<?= htmlspecialchars($account['username']) ?>', '<?= $server_name ?>', event)"
+                                            class="btn unban-btn">Renew</button>
+			        <?php endif; ?>
                                 <?php if ($is_banned): ?>
 		        	    <button onclick="return confirmAction('unban', '<?= htmlspecialchars($account['username']) ?>', '<?= $server_name ?>', event)"
                                             class="btn unban-btn">Unban</button>

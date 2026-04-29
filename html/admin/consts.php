@@ -35,6 +35,7 @@ define('SHOW_PKI_INDEX','/etc/openvpn/server/cmd/show_index.sh');
 define('CREATE_CRT','/etc/openvpn/server/cmd/create_client.sh');
 define('REVOKE_CRT','/etc/openvpn/server/cmd/revoke_client.sh');
 define('SHOW_SERVERS_CRT','/etc/openvpn/server/cmd/show_servers_crt.sh');
+define('SHOW_CRT_DATE','/etc/openvpn/server/cmd/show_crt_date.sh');
 define('BAN_CLIENT','/etc/openvpn/server/cmd/ban_client.sh');
 define('SHOW_BANNED','/etc/openvpn/server/cmd/show_banned.sh');
 define('GET_IPS_FROM_CCD','/etc/openvpn/server/cmd/show_client_ccd.sh');

@@ -92,50 +92,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'generate_config') {
     }
 
 // Обработка создания пользователя
-//if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'create_user' && !empty(CREATE_CRT) && file_exists(CREATE_CRT)) {
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'create_user' && !empty(CREATE_CRT)) {
-    // Проверка CSRF
-/*    if (empty($_POST['csrf']) || $_POST['csrf'] !== $_SESSION['csrf_token']) {
-        header('HTTP/1.0 403 Forbidden');
-        die(json_encode(['success' => false, 'message' => 'Invalid CSRF token']));
-    }
-*/
-
-    $server_name = $_POST['server'] ?? '';
-    $username = trim($_POST['username'] ?? '');
-    
-    if (empty($username) || !isset($servers[$server_name]) || empty($servers[$server_name]['cert_index'])) {
-        die(json_encode(['success' => false, 'message' => 'Invalid parameters']));
-    }
-
-    mb_internal_encoding('UTF-8');
-    $username = mb_strtolower($username);
-
-    // Проверка на пробельные символы
-    if (preg_match('/\s/', $username)) {
-        die(json_encode(['success' => false, 'message' => 'Username cannot contain spaces']));
-    }
-    
-    $server = $servers[$server_name];
-    $rsa_dir = dirname(dirname($server['cert_index']));
-
-    $script_path = CREATE_CRT;
-    $command = sprintf(
-        'sudo %s %s %s 2>&1',
-	escapeshellcmd($script_path),
-        escapeshellarg($rsa_dir),
-        escapeshellarg($username)
-    );
-    
-    exec($command, $output, $return_var);
-    
-    if ($return_var === 0) {
-        echo json_encode(['success' => true, 'message' => 'User created successfully']);
-    } else {
-        echo json_encode(['success' => false, 'message' => 'Failed to create user: ' . implode("\n", $output)]);
-    }
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'create_user') {
+    process_create_user($servers);
     exit;
-}
+    }
 
 ?>
 
@@ -160,6 +120,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         .status-badge { padding: 2px 5px; border-radius: 3px; font-size: 0.8em; }
         .status-active { background-color: #ccffcc; }
         .status-banned { background-color: #ff9999; }
+        .cert-date {
+            font-size: 0.85em;
+            font-family: monospace;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        .cert-date.valid {
+            color: #28a745;
+            background-color: #e8f5e9;
+        }
+        .cert-date.expiring-soon {
+            color: #ff9800;
+            background-color: #fff3e0;
+        }
+        .cert-date.expires-today {
+            color: #ff5722;
+            background-color: #fbe9e7;
+            font-weight: bold;
+        }
+        .cert-date.expired {
+            color: #f44336;
+            background-color: #ffebee;
+            text-decoration: line-through;
+        }
+        .cert-date.error {
+            color: #9e9e9e;
+            background-color: #f5f5f5;
+        }
         .server-section { border: 1px solid #ddd; padding: 15px; margin-bottom: 20px; border-radius: 5px; }
         .spoiler { margin-top: 10px; }
         .spoiler-title { 

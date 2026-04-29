@@ -10,3 +10,4 @@ www-data ALL=(root)      NOPASSWD: /etc/openvpn/server/cmd/show_index.sh
 www-data ALL=(root)      NOPASSWD: /etc/openvpn/server/cmd/show_servers_crt.sh
 www-data ALL=(root)      NOPASSWD: /etc/openvpn/server/cmd/show_user_config.sh
 www-data ALL=(root)      NOPASSWD: /etc/openvpn/server/cmd/write_user_config.sh
+www-data ALL=(root)      NOPASSWD: /etc/openvpn/server/cmd/show_crt_date.sh
