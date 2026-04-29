@@ -84,7 +84,9 @@ ob_start();
                     </span>
                 </td>
                 <td>
-                    <?php if (isset($account['cert_date']) && $account['cert_date'] !== '-'): ?>
+                    <?php
+                         $account = $accounts[$client['name']];
+                         if (!empty($account) &&  isset($account['cert_date']) && $account['cert_date'] !== '-'): ?>
                             <div class="cert-info">
                                 <span class="cert-date 
                                     <?= $account['expired'] ? 'expired' : ($account['days_left'] < 7 ? 'expiring-soon' : 'valid') ?>">
