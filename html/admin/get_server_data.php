@@ -61,6 +61,7 @@ ob_start();
                 <th>Connected</th>
                 <th>Cipher</th>
                 <th>Status</th>
+                <th>Cert</th>
                 <th>Actions</th>
             </tr>
         </thead>
@@ -81,6 +82,28 @@ ob_start();
                     <span class="status-badge <?= $client['banned'] ? 'status-banned' : 'status-active' ?>">
                         <?= $client['banned'] ? 'BANNED' : 'Active' ?>
                     </span>
+                </td>
+                <td>
+                    <?php if (isset($account['cert_date']) && $account['cert_date'] !== '-'): ?>
+                            <div class="cert-info">
+                                <span class="cert-date 
+                                    <?= $account['expired'] ? 'expired' : ($account['days_left'] < 7 ? 'expiring-soon' : 'valid') ?>">
+                                    <?= htmlspecialchars($account['cert_date']) ?>
+                                </span>
+                                <?php if ($account['days_left'] !== null): ?>
+                                    <span class="cert-days 
+                                        <?= $account['expired'] ? 'expired' : ($account['days_left'] < 7 ? 'urgent' : ($account['days_left'] < 30 ? 'warning' : '')) ?>">
+                                        <?php if ($account['expired']): ?>
+                                            (expired <?= $account['days_left'] ?>d ago)
+                                        <?php else: ?>
+                                            (<?= $account['days_left'] ?>d left)
+                                        <?php endif; ?>
+                                    </span>
+                                <?php endif; ?>
+                            </div>
+                        <?php else: ?>
+                            <span class="cert-date error">No certificate</span>
+                        <?php endif; ?>
                 </td>
                 <td class="actions">
                     <?php if ($client['banned']): ?>
