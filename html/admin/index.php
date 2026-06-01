@@ -12,6 +12,7 @@ if (!file_exists($config_file)) {
 }
 
 $servers = require $config_file;
+require_once 'functions.php';
 
 session_start();
 
