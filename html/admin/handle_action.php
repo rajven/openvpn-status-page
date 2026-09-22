@@ -1,5 +1,10 @@
 <?php
 
+error_reporting(0);
+ini_set('display_errors', 0);
+
+session_start();
+
 define("CONFIG", 1);
 
 require_once 'functions.php';
@@ -53,12 +58,15 @@ try {
         default:
             throw new Exception('Invalid action');
     }
-    
+    // Сбрасываем кэш для конкретного сервера
+    if (isset($_SESSION['cached_status'][$server_name])) {
+        unset($_SESSION['cached_status'][$server_name]);
+    }
+    $_SESSION['last_request_time'][$server_name] = 0;
     echo json_encode(['success' => $result]);
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);
 }
 
-$clean_url = strtok($_SERVER['REQUEST_URI'], '?');
-header("Refresh:0; url=" . $clean_url);
 exit;
+

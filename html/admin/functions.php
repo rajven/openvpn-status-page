@@ -80,9 +80,9 @@ function openvpnManagementCommand($server, $command) {
     }
 }
 
-function getOpenVPNStatus($server) {
+function getOpenVPNStatus($server, $force = false) {
     // Проверяем, можно ли делать запрос
-    if (!canRequestStatus($server)) {
+    if (!$force && !canRequestStatus($server)) {
         // Возвращаем кэшированные данные или пустой массив
         return $_SESSION['cached_status'][$server['name']] ?? [];
     }
@@ -654,7 +654,10 @@ function revokeClient($server, $client_name) {
 
     exec($command, $output, $return_var);
 
+    $_SESSION['last_request_time'] = [];
+
     if ($return_var === 0) {
+        kickClient($server, $client_name);
         return true;
     } else {
         return false;

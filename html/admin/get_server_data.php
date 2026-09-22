@@ -1,6 +1,13 @@
 <?php
 
+// Отключаем кэширование HTTP
+header('Cache-Control: no-cache, no-store, must-revalidate');
+header('Pragma: no-cache');
+header('Expires: 0');
+
 session_start();
+
+$force_refresh = isset($_GET['force']) && $_GET['force'] === '1';
 
 // 1. Проверяем AJAX-запрос
 if (empty($_SERVER['HTTP_X_REQUESTED_WITH']) || strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) !== 'xmlhttprequest') {
@@ -28,6 +35,7 @@ if (!file_exists($config_file)) {
     die("Configuration file not found: $config_file");
 }
 
+
 $servers = require_once $config_file;
 
 $server_name = $_GET['server'] ?? '';
@@ -39,7 +47,7 @@ if (!isset($servers[$server_name])) {
 }
 
 $server = $servers[$server_name];
-$clients = getOpenVPNStatus($server);
+$clients = getOpenVPNStatus($server,$force_refresh);
 $banned_clients = getBannedClients($server);
 $accounts = getAccountList($server);
 
@@ -136,6 +144,14 @@ ob_start();
             Configured Account List (<?= count($accounts) ?>)
         </div>
         <div class="spoiler-content">
+	    <label class="hide-revoked-label">
+	    <input type="checkbox"
+               class="hide-revoked-checkbox"
+               data-server="<?= htmlspecialchars($server_name) ?>"
+               onchange="toggleRevokedRows(this)"
+               checked>
+            Hide revoked
+	    </label>
             <table>
                 <thead>
                     <tr>
@@ -147,10 +163,14 @@ ob_start();
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($accounts as $account):
-                    if (isClientActive($clients,$account["username"])) { continue; }
+                    <?php 
+		    foreach ($accounts as $account):
+                	if (isClientActive($clients,$account["username"])) { continue; }
+                        $is_revoked = $account['revoked'];
+	                $is_banned = $account['banned'];
+	                $is_expired = $account['expired'];
                     ?>
-                    <tr>
+                    <tr class="<?= $is_revoked ? 'revoked-row' : '' ?>">
                         <td>
                             <a href="#" onclick="return generateConfig('<?= $server_name ?>', '<?= htmlspecialchars($account['username']) ?>', event)">
                                 <?= htmlspecialchars($account['username']) ?>
@@ -158,10 +178,15 @@ ob_start();
                         </td>
                         <td><?= htmlspecialchars($account['ip'] ?? 'N/A') ?></td>
                         <?php
-                        $is_revoked = $account['revoked'];
-                        $is_banned = $account['banned'];
-			$status_class = $is_revoked ? 'status-banned' : ($is_banned ? 'status-banned' : 'status-active');
-			$status_text = $is_revoked ? 'REVOKED' : ($is_banned ? 'BANNED' : 'ENABLED');
+                        $status_class = $is_revoked ? 'status-banned'
+                                : ($is_expired ? 'status-expired'
+                                : ($is_banned ? 'status-banned'
+                                : 'status-active'));
+
+                        $status_text = $is_revoked ? 'REVOKED'
+                                : ($is_expired ? 'EXPIRED'
+                                : ($is_banned ? 'BANNED'
+                                : 'ENABLED'));
 			?>
 
 			<td>
@@ -197,11 +222,9 @@ ob_start();
                             <?php if ($is_revoked): ?>
                                 <span class="revoked-text">Certificate revoked</span>
                             <?php else: ?>
-			        <?php if (!$cert_info['valid']): ?>
-		        	    <button onclick="return confirmAction('renew', '<?= htmlspecialchars($account['username']) ?>', '<?= $server_name ?>', event)"
+		        	<button onclick="return confirmAction('renew', '<?= htmlspecialchars($account['username']) ?>', '<?= $server_name ?>', event)"
                                             class="btn unban-btn">Renew</button>
-			        <?php endif; ?>
-                                <?php if ($is_banned): ?>
+                                <?php if ($is_banned && !$is_expired): ?>
 		        	    <button onclick="return confirmAction('unban', '<?= htmlspecialchars($account['username']) ?>', '<?= $server_name ?>', event)"
                                             class="btn unban-btn">Unban</button>
                                 <?php else: ?>

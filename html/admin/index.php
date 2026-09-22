@@ -24,7 +24,6 @@ if (!isset($_SESSION['last_request_time']) || !is_array($_SESSION['last_request_
 }
 
 if (isset($_GET['action']) && $_GET['action'] === 'generate_config') {
-    session_start();
     
     // Проверка CSRF
 //    if (empty($_GET['csrf']) || $_GET['csrf'] !== $_SESSION['csrf_token']) {
@@ -112,6 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         th { background-color: #f2f2f2; }
         .banned { background-color: #ffeeee; }
+        .expired { background-color: #ccffcc; }
         .actions { white-space: nowrap; }
         .btn { padding: 3px 8px; margin: 2px; cursor: pointer; border: 1px solid #ccc; border-radius: 3px; }
         .kick-btn { background-color: #ffcccc; }
@@ -121,6 +121,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         .status-badge { padding: 2px 5px; border-radius: 3px; font-size: 0.8em; }
         .status-active { background-color: #ccffcc; }
         .status-banned { background-color: #ff9999; }
+        .status-expired { background-color: #ffb02e; }
         .cert-date {
             font-size: 0.85em;
             font-family: monospace;
@@ -293,7 +294,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             background-color: #499E24;
         }
 
+        /* Скрытие revoked-строк по умолчанию */
+        .revoked-row {
+            display: none;
+        }
+        /* Показ при снятом чекбоксе */
+        .show-revoked .revoked-row {
+            display: table-row;
+        }
+        /* Оформление чекбокса */
+        .hide-revoked-label {
+            display: inline-block;
+            margin-bottom: 10px;
+            padding: 4px 10px;
+            background-color: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.9em;
+            user-select: none;
+        }
+        .hide-revoked-label:hover {
+            background-color: #e8e8e8;
+        }
+
     </style>
+
 </head>
 <body>
     <h1><?= htmlspecialchars($page_title) ?></h1>
@@ -333,6 +359,100 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     </div>
 
 <script>
+
+// ============================================
+// Динамическая загрузка SweetAlert2 с fallback
+// ============================================
+const SweetAlertLoader = {
+    loaded: false,
+    loading: null,
+    
+    load() {
+        if (this.loaded && window.Swal) {
+            return Promise.resolve(true);
+        }
+        
+        if (this.loading) {
+            return this.loading;
+        }
+        
+        this.loading = new Promise((resolve) => {
+            // Пробуем CDN
+            this.loadScript('https://cdn.jsdelivr.net/npm/sweetalert2@11', 5000)
+                .then(() => {
+                    console.log('✓ SweetAlert2 loaded from CDN');
+                    this.loaded = true;
+                    resolve(true);
+                })
+                .catch(() => {
+                    console.warn('CDN failed, trying local file...');
+                    // Fallback на локальный файл
+                    this.loadScript('js/sweetalert2.min.js', 3000)
+                        .then(() => {
+                            console.log('✓ SweetAlert2 loaded from local cache');
+                            this.loaded = true;
+                            resolve(true);
+                        })
+                        .catch(() => {
+                            console.error('✗ SweetAlert2 failed to load completely');
+                            resolve(false);
+                        });
+                });
+        });
+        
+        return this.loading;
+    },
+    
+    loadScript(src, timeout) {
+        return new Promise((resolve, reject) => {
+            if (window.Swal) {
+                resolve();
+                return;
+            }
+            
+            const script = document.createElement('script');
+            script.src = src;
+            script.async = true;
+            
+            const timer = setTimeout(() => {
+                script.remove();
+                reject(new Error(`Timeout loading ${src}`));
+            }, timeout);
+            
+            script.onload = () => {
+                clearTimeout(timer);
+                if (window.Swal) {
+                    resolve();
+                } else {
+                    script.remove();
+                    reject(new Error('Script loaded but Swal not found'));
+                }
+            };
+            
+            script.onerror = () => {
+                clearTimeout(timer);
+                script.remove();
+                reject(new Error(`Failed to load ${src}`));
+            };
+            
+            document.head.appendChild(script);
+        });
+    }
+};
+
+// Переключение видимости revoked-строк
+function toggleRevokedRows(checkbox) {
+    const serverName = checkbox.dataset.server;
+    const section = document.getElementById('server-' + serverName);
+    if (!section) return;
+
+    if (checkbox.checked) {
+        section.classList.remove('show-revoked');   // скрыть
+    } else {
+        section.classList.add('show-revoked');       // показать
+    }
+}
+
 function editCCD(server, username) {
     const width = 800;
     const height = 600;
@@ -385,80 +505,95 @@ function editCCD(server, username) {
     .then(data => { win.document.getElementById('ccd-textarea').value = data; })
     .catch(err => { win.document.getElementById('ccd-textarea').value = 'Error loading: ' + err.message; });
 }
-</script>
 
+// Функция для загрузки данных сервера
+function loadServerData(serverName,force = false) {
+    const serverElement = document.getElementById(`server-${serverName}`);
 
-    <script>
-        // Функция для загрузки данных сервера
-        function loadServerData(serverName) {
-            const serverElement = document.getElementById(`server-${serverName}`);
-            
-            fetch(`get_server_data.php?server=${serverName}&csrf=<?= $_SESSION['csrf_token'] ?>`,{
-		    headers: {
-			'X-Requested-With': 'XMLHttpRequest'
-		    }
-		})
-                .then(response => response.text())
-                .then(html => {
-                    serverElement.innerHTML = html;
-                    // Обновляем данные каждые 60 секунд
-                    setTimeout(() => loadServerData(serverName), 60000);
-                })
-                .catch(error => {
-                    serverElement.querySelector('.loading').textContent = 'Error loading data';
-                    console.error('Error:', error);
-                    // Повторяем попытку через 10 секунд при ошибке
-                    setTimeout(() => loadServerData(serverName), 10000);
-                });
-        }
+    if (!serverElement) {
+        console.error('serverElement not found for:', serverName);
+        return;
+    }
 
-        // Загружаем данные для всех серверов
-        document.addEventListener('DOMContentLoaded', function() {
-            <?php foreach ($servers as $server_name => $server): ?>
-                loadServerData('<?= $server_name ?>');
-            <?php endforeach; ?>
-        });
+    let url = `get_server_data.php?server=${encodeURIComponent(serverName)}&csrf=<?= $_SESSION['csrf_token'] ?>`;
+    if (force) {
+        url += '&force=1';
+    }
 
-        // Функция для обработки действий (ban/unban)
-        function handleAction(serverName, action, clientName) {
-
-            const params = new URLSearchParams();
-            params.append('server', serverName);
-            params.append('action', action);
-            params.append('client', clientName);
-
-            fetch('handle_action.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                body: params
+    fetch(url, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.text())
+        .then(html => {
+            serverElement.innerHTML = html;
+            const cb = serverElement.querySelector('.hide-revoked-checkbox');
+            if (cb) {
+                cb.checked = !serverElement.classList.contains('show-revoked');
+            }
+            setTimeout(() => loadServerData(serverName, force), 60000);
             })
+        .catch(error => {
+            serverElement.querySelector('.loading').textContent = 'Error loading data';
+            setTimeout(() => loadServerData(serverName,force), 10000);
+        });
+}
+
+// Загружаем данные для всех серверов
+document.addEventListener('DOMContentLoaded', function() {
+    <?php foreach ($servers as $server_name => $server): ?>
+        loadServerData('<?= $server_name ?>',false);
+    <?php endforeach; ?>
+});
+
+// Функция для обработки действий (ban/unban)
+function handleAction(serverName, action, clientName) {
+    console.log('=== handleAction START ===');
+    console.log('Server:', serverName, 'Action:', action, 'Client:', clientName);
+    const params = new URLSearchParams();
+    params.append('server', serverName);
+    params.append('action', action);
+    params.append('client', clientName);
+
+    fetch('handle_action.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: params
+    })
             .then(response => {
-                // 2. Проверяем статус ответа
                 if (!response.ok) {
                     throw new Error(`Server returned ${response.status} status`);
                 }
-                return response.json();
+                return response.text();
+            })
+            .then(text => {
+                try {
+                    const data = JSON.parse(text);
+                    return data;
+                } catch (e) {
+                    console.error('JSON parse error:', e.message);
+                    console.error('Raw text that failed to parse:', text);
+                    throw new Error('Invalid JSON response');
+                }
             })
             .then(data => {
-                // 3. Проверяем структуру ответа
-                if (!data || typeof data.success === 'undefined') {
-                    throw new Error('Invalid server response');
-                }
                 if (data.success) {
-                    loadServerData(serverName);
+                    loadServerData(serverName, true);
                 } else {
                     console.error('Server error:', data.message);
                     alert(`Error: ${data.message || 'Operation failed'}`);
                 }
             })
             .catch(error => {
-                // 4. Правильное отображение ошибки
                 console.error('Request failed:', error);
                 alert(`Request failed: ${error.message}`);
             });
+        
+            console.log('=== handleAction END ===');
         }
 
         // Функция для переключения спойлера
@@ -557,9 +692,8 @@ function editCCD(server, username) {
                     messageDiv.textContent = data.message || 'User created successfully';
                     messageDiv.className = 'message success';
                     usernameInput.value = '';
-                    
                     // Перезагружаем данные выбранного сервера
-                    loadServerData(serverName);
+                    loadServerData(serverName, true);
                 } else {
                     messageDiv.textContent = data.message || 'Error creating user';
                     messageDiv.className = 'message error';
@@ -582,11 +716,108 @@ function editCCD(server, username) {
             return false;
         }
 
-        // Простая версия с разными confirm сообщениями
         function confirmAction(action, username, serverName, event) {
             event.preventDefault();
+    
+            console.log('confirmAction called for:', action, username);
+    
+            SweetAlertLoader.load().then((swalAvailable) => {
+                if (swalAvailable && window.Swal) {
+                    console.log('Calling showSweetAlertConfirm...');
+                    showSweetAlertConfirm(action, username, serverName);
+                } else {
+                    console.log('Falling back to native confirm');
+                    showNativeConfirm(action, username, serverName);
+                }
+            }).catch(err => {
+                console.error('SweetAlertLoader error:', err);
+            });
+    
+            return false;
+        }
+
+        // Красивые диалоги через SweetAlert2
+        function showSweetAlertConfirm(action, username, serverName) {
+            let config = {};
+    
+            switch(action) {
+                case 'ban':
+                    config = {
+                        title: 'Ban User',
+                        text: `Are you sure you want to ban user ${username}?`,
+                        icon: 'warning',
+                        confirmButtonText: 'Yes, ban!',
+                        confirmButtonColor: '#ff9999'
+                    };
+                    break;
+                case 'unban':
+                    config = {
+                        title: 'Unban User',
+                        text: `Unban user ${username}?`,
+                        icon: 'question',
+                        confirmButtonText: 'Yes, unban!',
+                        confirmButtonColor: '#5cb85c'
+                    };
+                    break;
+                case 'renew':
+                    config = {
+                        title: 'Renew Certificate',
+                        text: 'This will revoke the current certificate and issue a new one. The old certificate will stop working.',
+                        icon: 'warning',
+                        confirmButtonText: 'Yes, renew!',
+                        confirmButtonColor: '#ff9800'
+                    };
+                    break;
+                case 'revoke':
+                    config = {
+                        title: 'Revoke Certificate',
+                        text: `This action is IRREVERSIBLE! Certificate for ${username} will be permanently disabled.`,
+                        icon: 'error',
+                        confirmButtonText: 'Yes, revoke!',
+                        confirmButtonColor: '#d33',
+                        input: 'text',
+                        inputPlaceholder: 'Type "REVOKE" to confirm',
+                        inputValidator: (value) => {
+                            if (value !== 'REVOKE') {
+                                return 'You must type "REVOKE" to confirm';
+                            }
+                        }
+                    };
+                    break;
+                case 'remove':
+                    config = {
+                        title: 'Remove Config',
+                        text: `Remove user ${username} config file?`,
+                        icon: 'warning',
+                        confirmButtonText: 'Yes, remove!',
+                        confirmButtonColor: '#ff9999'
+                    };
+                    break;
+                default:
+                    config = {
+                        title: 'Confirm Action',
+                        text: `Perform ${action} on ${username}?`,
+                        icon: 'question',
+                        confirmButtonText: 'Yes'
+                        };
+            }
+    
+            window.Swal.fire({
+                ...config,
+                showCancelButton: true,
+                cancelButtonText: 'Cancel',
+                cancelButtonColor: '#aaa'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    handleAction(serverName, action, username);
+                }
+            });
+        }
+
+        // Нативный confirm как последний запасной вариант
+        function showNativeConfirm(action, username, serverName) {
             let message;
-            let isDangerous = false;
+    
             switch(action) {
                 case 'ban':
                     message = `Ban user ${username}?`;
@@ -594,9 +825,11 @@ function editCCD(server, username) {
                 case 'unban':
                     message = `Unban user ${username}?`;
                     break;
+                case 'renew':
+                    message = `WARNING: Renew certificate for ${username}?\n\nThis will revoke the current certificate and issue a new one.\nThe old certificate will stop working.\n\nContinue?`;
+                    break;
                 case 'revoke':
-                    message = `WARNING: Revoke certificate for ${username}?\n\nThis action is irreversible and will permanently disable the certificate!`;
-                    isDangerous = true;
+                    message = `WARNING: Revoke certificate for ${username}?\n\nThis action is irreversible and will permanently disable the certificate!\n\nAre you ABSOLUTELY sure?`;
                     break;
                 case 'remove':
                     message = `Remove user ${username} config file?`;
@@ -604,20 +837,12 @@ function editCCD(server, username) {
                 default:
                     message = `Perform ${action} on ${username}?`;
             }
-            if (isDangerous) {
-                // Двойное подтверждение для опасных действий
-                if (confirm('⚠ ️ DANGEROUS ACTION - Please confirm')) {
-                    if (confirm(message)) {
-                        handleAction(serverName, action, username);
-                    }
-                }
-            } else {
-                if (confirm(message)) {
-                    handleAction(serverName, action, username);
-                }
+        
+            if (confirm(message)) {
+                handleAction(serverName, action, username);
             }
-            return false;
         }
+
     </script>
 
 &copy; 2024–<?= date('Y') ?> — OpenVPN Status Monitoring.  
