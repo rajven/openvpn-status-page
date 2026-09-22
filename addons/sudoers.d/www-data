@@ -1,5 +1,6 @@
 www-data ALL=(root)      NOPASSWD: /etc/openvpn/server/cmd/ban_client.sh
 www-data ALL=(root)      NOPASSWD: /etc/openvpn/server/cmd/create_client.sh
+www-data ALL=(root)      NOPASSWD: /etc/openvpn/server/cmd/renew_client.sh
 www-data ALL=(root)      NOPASSWD: /etc/openvpn/server/cmd/revoke_client.sh
 www-data ALL=(root)      NOPASSWD: /etc/openvpn/server/cmd/remove_ccd.sh
 www-data ALL=(root)      NOPASSWD: /etc/openvpn/server/cmd/show_banned.sh
@@ -7,7 +8,7 @@ www-data ALL=(root)      NOPASSWD: /etc/openvpn/server/cmd/show_client_crt.sh
 www-data ALL=(root)      NOPASSWD: /etc/openvpn/server/cmd/show_client_ccd.sh
 www-data ALL=(root)      NOPASSWD: /etc/openvpn/server/cmd/show_client_ipp.sh
 www-data ALL=(root)      NOPASSWD: /etc/openvpn/server/cmd/show_index.sh
+www-data ALL=(root)      NOPASSWD: /etc/openvpn/server/cmd/show_crt_date.sh
 www-data ALL=(root)      NOPASSWD: /etc/openvpn/server/cmd/show_servers_crt.sh
 www-data ALL=(root)      NOPASSWD: /etc/openvpn/server/cmd/show_user_config.sh
 www-data ALL=(root)      NOPASSWD: /etc/openvpn/server/cmd/write_user_config.sh
-www-data ALL=(root)      NOPASSWD: /etc/openvpn/server/cmd/show_crt_date.sh

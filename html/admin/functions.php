@@ -676,7 +676,7 @@ function isClientActive($active_clients,$username) {
     return false;
 }
 
-function process_create_user($servers, $server_name = null, $username = null, $force = false) {
+function process_create_user($servers, $server_name = null, $username = null) {
     // Если параметры не переданы (явно null), берем из $_POST
     if ($server_name === null) {
         $server_name = $_POST['server'] ?? '';
@@ -721,23 +721,13 @@ function process_create_user($servers, $server_name = null, $username = null, $f
     $server = $servers[$server_name];
     $rsa_dir = dirname(dirname($server['cert_index']));
 
-    // Выполнение команды создания пользователя
-    if (!$force) {
-        $command = sprintf(
+    $command = sprintf(
             'sudo %s %s %s 2>&1',
             escapeshellcmd(CREATE_CRT),
             escapeshellarg($rsa_dir),
             escapeshellarg($username)
             );
-        } else {
-        $command = sprintf(
-            'sudo %s %s %s --force 2>&1',
-            escapeshellcmd(CREATE_CRT),
-            escapeshellarg($rsa_dir),
-            escapeshellarg($username)
-            );
-        }
-    
+
     error_log("Creating user: $username on server: $server_name");
     error_log("Command: $command");
     
@@ -750,6 +740,74 @@ function process_create_user($servers, $server_name = null, $username = null, $f
     } else {
         $error_message = implode("\n", $output);
         error_log("Failed to create user $username: $error_message");
+        send_json_response(false, 'Failed to create user: ' . $error_message);
+    }
+    return true;
+}
+
+function process_renew_user($servers, $server_name = null, $username = null) {
+    // Если параметры не переданы (явно null), берем из $_POST
+    if ($server_name === null) {
+        $server_name = $_POST['server'] ?? '';
+    }
+    if ($username === null) {
+        $username = trim($_POST['username'] ?? '');
+    }
+
+    // Проверка наличия скрипта создания
+    if (empty(RENEW_CRT)) {
+        send_json_response(false, 'Create certificate script not configured');
+        return true;
+    }
+
+    if (empty($username) || !isset($servers[$server_name]) || empty($servers[$server_name]['cert_index'])) {
+        send_json_response(false, 'Invalid parameters');
+        return true;
+    }
+
+    // Нормализация имени пользователя
+//    mb_internal_encoding('UTF-8');
+//    $username = mb_strtolower($username);
+    
+    // Проверка на пробельные символы
+    if (preg_match('/\s/', $username)) {
+        send_json_response(false, 'Username cannot contain spaces');
+        return true;
+    }
+    
+    // Проверка на специальные символы
+    if (!preg_match('/^[a-zA-Z0-9_-]+$/', $username)) {
+        send_json_response(false, 'Username can only contain letters, numbers, underscores and hyphens');
+        return true;
+    }
+    
+    // Проверка длины имени
+    if (strlen($username) < 3 || strlen($username) > 32) {
+        send_json_response(false, 'Username must be between 3 and 32 characters');
+        return true;
+    }
+
+    $server = $servers[$server_name];
+    $rsa_dir = dirname(dirname($server['cert_index']));
+
+    $command = sprintf(
+            'sudo %s %s %s 2>&1',
+            escapeshellcmd(RENEW_CRT),
+            escapeshellarg($rsa_dir),
+            escapeshellarg($username)
+            );
+
+    error_log("Renew user: $username on server: $server_name");
+    error_log("Command: $command");
+    
+    exec($command, $output, $return_var);
+    
+    if ($return_var === 0) {
+        error_log("User $username renewed successfully on server $server_name");
+        send_json_response(true, 'User created successfully');
+    } else {
+        $error_message = implode("\n", $output);
+        error_log("Failed to renew user $username: $error_message");
         send_json_response(false, 'Failed to create user: ' . $error_message);
     }
     return true;

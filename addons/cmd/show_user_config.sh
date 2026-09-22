@@ -1,7 +1,12 @@
 #!/bin/bash
 
+set -o errexit
+set -o nounset
+set -o pipefail
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 #SCRIPT_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
+source "$SCRIPT_DIR/config"
 source "$SCRIPT_DIR/functions.sh"
 
 show_usage() {
@@ -14,18 +19,21 @@ main() {
     # Check permissions
     check_permissions
 
-    # Process arguments
-    [[ $# -lt 1 ]] && show_usage
+    # Process arguments (ровно один аргумент)
+    [[ $# -ne 1 ]] && show_usage
 
-    local ccd_file=$1
-    local ccd_dir=$(dirname $ccd_file)
+    # Кавычки обязательны для защиты от пробелов в путях
+    local ccd_file="$1"
+    local ccd_dir
+    ccd_dir=$(dirname "$ccd_file")
 
     # Validate CCD directory path
     check_ccd_path "$ccd_dir"
 
-    if [ -e "$ccd_file" ]; then
+    # Проверяем, что это именно файл
+    if [[ -f "$ccd_file" ]]; then
         cat "${ccd_file}"
-        fi
+    fi
 
     exit 0
 }

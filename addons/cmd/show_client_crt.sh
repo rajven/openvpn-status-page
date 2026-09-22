@@ -6,6 +6,7 @@ set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 #SCRIPT_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
+source "$SCRIPT_DIR/config"
 source "$SCRIPT_DIR/functions.sh"
 
 show_usage() {
@@ -20,8 +21,9 @@ main() {
 
     check_permissions
 
-    local CN=$1
-    local PKI_DIR=${2:-/etc/openvpn/server/server/rsa/pki}
+    # Используем кавычки для защиты от пробелов и спецсимволов
+    local CN="$1"
+    local PKI_DIR="${2:-/etc/openvpn/server/server/rsa/pki}"
 
     # Validate PKI directory
     validate_pki_dir "${PKI_DIR}"
@@ -33,9 +35,20 @@ main() {
         exit 3
     }
 
+    # Validate that the found file is actually a valid certificate
+    # Это также гарантирует, что следующий вызов для извлечения серийника не упадёт
+    if ! openssl x509 -in "${CERT_FILE}" -noout 2>/dev/null; then
+        log "Error: File found is not a valid certificate: ${CERT_FILE}"
+        exit 3
+    fi
+
     # Extract serial number for key lookup
+    # Используем 2>/dev/null, чтобы подавить возможные предупреждения в stderr
     local SERIAL
-    SERIAL=$(openssl x509 -in "${CERT_FILE}" -noout -serial | cut -d= -f2)
+    SERIAL=$(openssl x509 -in "${CERT_FILE}" -noout -serial 2>/dev/null | cut -d= -f2) || {
+        log "Error: Failed to extract serial number from certificate ${CERT_FILE}"
+        exit 3
+    }
 
     # Find private key file
     local KEY_FILE
@@ -44,8 +57,15 @@ main() {
         exit 4
     }
 
+    # Additional safety check: ensure the key file is readable
+    if [[ ! -r "${KEY_FILE}" ]]; then
+        log "Error: Private key file is not readable: ${KEY_FILE}"
+        exit 4
+    fi
+
     # Output results in XML-like format
     echo "<cert>"
+    # openssl нормализует вывод, убирая возможный текстовый мусор
     openssl x509 -in "${CERT_FILE}"
     echo "</cert>"
     echo

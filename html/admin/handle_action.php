@@ -42,10 +42,10 @@ try {
             $result = unbanClient($server, $client_name);
             break;
         case 'renew':
-            $result = process_create_user($servers, $server_name, $client_name, true);
+            $result = process_renew_user($servers, $server_name, $client_name);
             break;
         case 'add':
-            $result = process_create_user($servers, $server_name, $client_name, false);
+            $result = process_create_user($servers, $server_name, $client_name);
             break;
         case 'remove':
             $result = removeCCD($server, $client_name);

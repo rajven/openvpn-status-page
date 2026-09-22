@@ -2,20 +2,21 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 #SCRIPT_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
+source "$SCRIPT_DIR/config"
 source "$SCRIPT_DIR/functions.sh"
 
 if [ "$#" -ne 3 ]; then
-    log "Usage: $0 <service_name> <rsa_dir> <username>"
+    echo "Usage: $0 <service_name> <rsa_dir> <username>"
     exit 1
 fi
 
 check_permissions
 
-SRV_NAME="${1}"
-RSA_DIR="${2}"
-USERNAME="${3}"
+SRV_NAME="$1"
+RSA_DIR="$2"
+USERNAME="$3"
 
-log "Starting certificate revocation for $USERNAME by user $ORIGINAL_USER"
+log "Starting certificate revocation for $USERNAME by user ${SUDO_USER:-$USER}"
 
 # Check that the RSA directory exists
 if [ ! -d "$RSA_DIR" ]; then
@@ -39,48 +40,41 @@ if [ ! -f "./pki/issued/${USERNAME}.crt" ]; then
 fi
 
 # Check whether the certificate is already revoked
-if grep -q "/CN=${USERNAME}" ./pki/index.txt | grep -q "R"; then
+if grep -qP "^R.*CN=${USERNAME}(\s|$)" ./pki/index.txt; then
     log "Error: Certificate for $USERNAME is already revoked"
     exit 1
 fi
 
+# Ensure unique_subject = no (allows reissuing certs with same CN after revocation)
+ensure_unique_subject "${RSA_DIR}/pki" || exit 1
+
 # Revoke the certificate
 log "Revoking certificate for user: $USERNAME"
-./easyrsa --batch revoke "$USERNAME"
-
-if [ $? -eq 0 ]; then
-    log "Successfully revoked certificate for $USERNAME"
-
-    # Generate CRL (Certificate Revocation List)
-    log "Generating CRL..."
-    ./easyrsa --batch gen-crl
-
-    if [ $? -eq 0 ]; then
-        log "CRL generated successfully"
-
-        chown ${owner_user}:${owner_group} -R "$RSA_DIR/pki/issued/"
-        chown ${owner_user}:${owner_group} "$RSA_DIR/pki/crl.pem"
-        chmod 660 "${RSA_DIR}/pki/issued/"*.crt
-
-        # Restart the service
-        log "Restarting service: $SRV_NAME"
-        systemctl restart "${SRV_NAME}"
-
-        if [ $? -eq 0 ]; then
-            log "Service $SRV_NAME restarted successfully"
-            log "Certificate revocation completed for $USERNAME"
-            exit 0
-        else
-            log "Error: Failed to restart service $SRV_NAME"
-            exit 1
-        fi
-    else
-        log "Error: Failed to generate CRL"
-        exit 1
-    fi
-else
+if ! ./easyrsa --batch revoke-issued "$USERNAME"; then
     log "Error: Failed to revoke certificate for $USERNAME"
     exit 1
 fi
+log "Successfully revoked certificate for $USERNAME"
 
+# Generate CRL (Certificate Revocation List)
+log "Generating CRL..."
+if ! ./easyrsa --batch gen-crl; then
+    log "Error: Failed to generate CRL"
+    exit 1
+fi
+log "CRL generated successfully"
+
+# Set ownership and permissions for CRL
+chown "${owner_user}:${owner_group}" "$RSA_DIR/pki/crl.pem"
+chmod 644 "$RSA_DIR/pki/crl.pem"
+
+# Restart the service
+log "Restarting service: $SRV_NAME"
+if ! systemctl restart "${SRV_NAME}"; then
+    log "Error: Failed to restart service $SRV_NAME"
+    exit 1
+fi
+log "Service $SRV_NAME restarted successfully"
+
+log "Certificate revocation completed for $USERNAME"
 exit 0

@@ -1,42 +1,37 @@
 #!/bin/bash
 
+set -o errexit
+set -o nounset
 set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-#SCRIPT_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
+source "$SCRIPT_DIR/config"
 source "$SCRIPT_DIR/functions.sh"
 
 show_usage() {
-    echo "Usage: $0 [path_to_index.txt]"
-    echo "Default index.txt: /etc/openvpn/server/server/rsa/pki/index.txt"
+    echo "Usage: $0 <path_to_index.txt>"
+    echo "Example: $0 /etc/openvpn/server/server/rsa/pki/index.txt"
     exit 1
 }
 
 main() {
-    # Process arguments
-    [[ $# -lt 1 ]] && show_usage
+    # Аргумент обязателен, проверяем что передан ровно 1 аргумент
+    [[ $# -ne 1 ]] && show_usage
 
     check_permissions
 
     local index_txt="$1"
     local PKI_DIR
 
-    # If a file path was provided, get its directory
+    # Получаем директорию из пути к файлу
     PKI_DIR=$(dirname "${index_txt}")
 
-    # Validate the PKI directory
+    # validate_pki_dir проверит, что директория существует и в ней есть index.txt
+    # Если файла нет, функция сама сделает exit с кодом 2
     validate_pki_dir "${PKI_DIR}"
 
-    # Default to index.txt if needed
-    index_txt="${index_txt:-${PKI_DIR}/index.txt}"
-
-    # Check existence and output
-    if [ -e "${index_txt}" ]; then
-        cat "${index_txt}"
-    else
-        log "Error: index.txt not found in ${PKI_DIR}"
-        exit 1
-    fi
+    # Выводим содержимое (файл гарантированно существует благодаря validate_pki_dir)
+    cat "${index_txt}"
 }
 
 main "$@"

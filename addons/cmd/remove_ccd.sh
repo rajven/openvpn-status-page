@@ -6,6 +6,7 @@ set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 #SCRIPT_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
+source "$SCRIPT_DIR/config"
 source "$SCRIPT_DIR/functions.sh"
 
 show_usage() {
@@ -21,21 +22,20 @@ main() {
     # Process arguments
     [[ $# -lt 1 ]] && show_usage
 
-    local ccd_file=$1
+    local ccd_file="$1"
 
     # Validate CCD file path
     check_ccd_path "$ccd_file"
 
-    # Final safety check before removal
+    # Check if file exists before removal
     if [[ ! -f "$ccd_file" ]]; then
-        log "Error: CCD file not found (nothing to remove): $ccd_file"
+        log "CCD file not found (nothing to remove): $ccd_file"
         exit 0
     fi
 
     log "Removing CCD file: $ccd_file"
     rm -f "${ccd_file}"
-
-    exit 0
+    log "CCD file removed successfully: $ccd_file"
 }
 
 main "$@"

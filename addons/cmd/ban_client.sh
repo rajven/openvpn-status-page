@@ -6,6 +6,7 @@ set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 #SCRIPT_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
+source "$SCRIPT_DIR/config"
 source "$SCRIPT_DIR/functions.sh"
 
 show_usage() {
@@ -21,18 +22,25 @@ main() {
     # Process arguments
     [[ $# -lt 2 ]] && show_usage
 
-    local ccd_file=$1
-    local action=$2
+    local ccd_file="$1"
+    local action="$2"
 
     # Validate CCD file path
     check_ccd_path "$ccd_file"
 
     local username
-    username=$(basename "${ccd_file}")
+    username="$(basename "${ccd_file}")"
 
+    # For unban, if file doesn't exist - user is not banned
+    if [[ "$action" == "unban" && ! -f "$ccd_file" ]]; then
+        log "User ${username} is not banned (CCD file does not exist)"
+        exit 0
+    fi
+
+    # Ensure file exists for further operations
     touch "${ccd_file}"
     chmod 660 "${ccd_file}"
-    chown ${owner_user}:${owner_group} "${ccd_file}"
+    chown "${owner_user}:${owner_group}" "${ccd_file}"
 
     local is_banned=""
     if grep -q "^disable$" "$ccd_file"; then
@@ -43,7 +51,11 @@ main() {
         ban)
             if [[ -z "$is_banned" ]]; then
                 log "Ban user: ${username}"
-                echo -e "disable\n$(cat "$ccd_file")" > "$ccd_file"
+                # Prepend "disable" safely via temp file
+                { printf 'disable\n'; cat "$ccd_file"; } > "${ccd_file}.tmp"
+                mv "${ccd_file}.tmp" "$ccd_file"
+                chmod 660 "$ccd_file"
+                chown "${owner_user}:${owner_group}" "$ccd_file"
                 log "User ${username} banned successfully"
             else
                 log "User ${username} is already banned"
