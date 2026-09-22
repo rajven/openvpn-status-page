@@ -38,7 +38,7 @@ if (!isset($servers[$server_name]) || empty($username)) {
 $ccd_file = $servers[$server_name]['ccd'] . "/" . $username;
 
 // Путь к скрипту
-$script_path = '/etc/openvpn/server/cmd/show_user_config.sh'; // GET_USER_CCD
+$script_path = GET_USER_CCD;
 
 $command = sprintf(
     'sudo %s %s 2>&1',

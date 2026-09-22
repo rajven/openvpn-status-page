@@ -452,28 +452,25 @@ function getAccountList($server) {
     if (!empty($server['ipp_file'])) {
         $ipps = getClientIPsIPP($server);
         foreach ($ipps as $username => $ip) {
-            if (!isset($accounts[$username]) && empty($server['cert_index'])) {
+            if (empty($accounts[$username])) {
                 $accounts[$username] = getDefaultAccount($username, isset($banned[$username]));
             }
-            if (isset($accounts[$username]) && !empty($server['cert_index'])) {
+            if (empty($accounts[$username]["ip"]) && !empty($ip)) {
                 $accounts[$username]["ip"] = $ip;
             }
         }
     }
 
-    // Ищем IP-адреса в CCD файлах
-    if (!empty($server['ccd']) && is_dir($server['ccd'])) {
+    // Ищем IP-адреса в CCD файлах - перезаписываем IPP!!!
+    if (!empty($server['ccd'])) {
         $ccds = getClientIPsCCD($server);
         foreach ($ccds as $username => $ip) {
-            if (!isset($accounts[$username]) && empty($server['cert_index'])) {
+            if (empty($accounts[$username])) {
                 $accounts[$username] = getDefaultAccount($username, isset($banned[$username]));
             }
-            if (isset($accounts[$username]) && !empty($server['cert_index'])) {
-                $accounts[$username]["ip"] = $ip;
-            }
+            $accounts[$username]["ip"] = $ip;
         }
     }
-    
     return $accounts;
 }
 
