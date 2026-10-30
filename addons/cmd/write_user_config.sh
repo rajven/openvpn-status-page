@@ -47,6 +47,14 @@ main() {
         cp "$input_file" "$ccd_file"
     fi
 
+    # Если конфиг пустой или содержит только пробельные символы,
+    # удаляем файл с диска вместо сохранения пустого CCD (см. аналог в ban_client.sh)
+    if [[ ! -s "$ccd_file" ]] || ! grep -q '[^[:space:]]' "$ccd_file"; then
+        rm -f "$ccd_file"
+        log "Empty config, CCD file removed: $ccd_file"
+        exit 0
+    fi
+
     # Устанавливаем права и владельца
     chmod 660 "$ccd_file"
     chown "${owner_user}:${owner_group}" "$ccd_file"
