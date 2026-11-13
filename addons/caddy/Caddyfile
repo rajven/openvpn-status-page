@@ -1,0 +1,63 @@
+# Caddyfile для openvpn-status-page (замена nginx-конфига из патча 0001)
+
+# Перед использованием:
+# 1. Заменить vpn.example.com на адрес сайта (или :80 для чистого HTTP).
+# 2. Сгенерировать хеши: caddy hash-password и вписать вместо <bcrypt-хеш>.
+# 3. Проверить имя сокета под установленную версию PHP-FPM.
+# 4. caddy validate --config Caddyfile
+
+vpn.example.com {
+	root * /var/www/vpn
+
+	header {
+		X-Frame-Options "SAMEORIGIN"
+		X-Content-Type-Options "nosniff"
+		-X-Powered-By
+	}
+
+	@sensitive path /.env /.ht* /.*.swp /*.swp /.git /.git/*
+	respond @sensitive 403
+
+	respond /favicon.ico "" 204
+	respond /robots.txt "" 204
+
+	# --- панель администратора ---
+	@admin path /admin /admin/*
+	handle @admin {
+		basic_auth {
+			admin <bcrypt-хеш>
+		}
+		php_fastcgi unix//run/php/php8.3-fpm.sock {
+			capture_stderr
+		}
+		file_server
+	}
+
+	# --- пользовательский уголок (скачивание .ovpn с приватными ключами) ---
+	@ccd path /ccd /ccd/*
+	handle @ccd {
+		basic_auth {
+			user1 <bcrypt-хеш>
+			# по строке на каждого VPN-пользователя
+		}
+		php_fastcgi unix//run/php/php8.3-fpm.sock {
+			capture_stderr
+			# ccd/index.php берёт имя пользователя из REMOTE_USER.
+			# Без этой строки Caddy не передаст логин в PHP и endpoint
+			# будет всегда требовать авторизацию (PHP_AUTH_USER он не шлёт).
+			env REMOTE_USER {http.auth.user.id}
+		}
+		file_server
+	}
+
+	# --- всё остальное: главная страница ---
+	php_fastcgi unix//run/php/php8.3-fpm.sock {
+		capture_stderr
+	}
+	file_server
+
+	log {
+		format console
+		output file /var/log/caddy/vpn.access.log
+	}
+}
