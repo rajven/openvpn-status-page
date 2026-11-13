@@ -177,8 +177,12 @@
                     <span class="loading">Определение...</span>
                 </td>
             </tr>
-                <td><a href="/admin/" target="_blank">Панель администратора</a></td>
-                <td><a href="/ccd/" target="_blank">Уголок пользователя</a></td>
+            <tr>
+                <th>Разделы</th>
+                <td>
+                    <a href="/admin/" target="_blank">Панель администратора</a> ·
+                    <a href="/ccd/" target="_blank">Уголок пользователя</a>
+                </td>
             </tr>
         </table>
 

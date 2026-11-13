@@ -116,6 +116,9 @@ function getOpenVPNStatus($server, $force = false) {
         if ($in_client_list && strpos($line, 'CLIENT_LIST') === 0) {
             $parts = explode(',', $line);
             if (count($parts) >= 9) {
+                // Подключения без клиентского сертификата (CN=UNDEF)
+                // через панель не управляются — не показываем их
+                if ($parts[1] === 'UNDEF') { continue; }
                 $clients[] = [
                     'name' => $parts[1],
                     'real_ip' => $parts[2],
@@ -123,7 +126,7 @@ function getOpenVPNStatus($server, $force = false) {
                     'bytes_received' => formatBytes($parts[5]),
                     'bytes_sent' => formatBytes($parts[6]),
                     'connected_since' => $parts[7],
-                    'username' => $parts[8] ?? $parts[1],
+                    'username' => $parts[9] ?? $parts[1],
                     'cipher' => end($parts),
                     'banned' => isset($banned[$parts[1]]),
                 ];
@@ -670,6 +673,15 @@ function formatBytes($bytes) {
     return round($bytes/pow(1024,$pow),2).' '.$units[$pow];
 }
 
+// Валидация имени клиента для операций, где оно уходит в путь CCD-файла.
+// Точка допускается (legacy-сертификаты с CN вида "user.name"),
+// слэши, управляющие символы и обход каталогов запрещены.
+// Для create/renew остаётся более строгая проверка как раньше.
+function isValidUsername($username) {
+    return is_string($username)
+        && preg_match('/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/', $username) === 1;
+}
+
 function isClientActive($active_clients,$username) {
     $active_names = array_column($active_clients, 'name');
     if (in_array($username,$active_names)) { return true; }
@@ -804,11 +816,11 @@ function process_renew_user($servers, $server_name = null, $username = null) {
     
     if ($return_var === 0) {
         error_log("User $username renewed successfully on server $server_name");
-        send_json_response(true, 'User created successfully');
+        send_json_response(true, 'User renewed successfully');
     } else {
         $error_message = implode("\n", $output);
         error_log("Failed to renew user $username: $error_message");
-        send_json_response(false, 'Failed to create user: ' . $error_message);
+        send_json_response(false, 'Failed to renew user: ' . $error_message);
     }
     return true;
 }

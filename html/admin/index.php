@@ -16,7 +16,11 @@ require_once 'functions.php';
 
 session_start();
 
-$_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+// Токен живёт всю сессию: пересоздание на каждый запрос ломало бы
+// параллельно открытые вкладки и AJAX-поллы, отправленные со старым токеном.
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
 
 // Проверяем и инициализируем массив, если его нет
 if (!isset($_SESSION['last_request_time']) || !is_array($_SESSION['last_request_time'])) {
@@ -26,10 +30,11 @@ if (!isset($_SESSION['last_request_time']) || !is_array($_SESSION['last_request_
 if (isset($_GET['action']) && $_GET['action'] === 'generate_config') {
     
     // Проверка CSRF
-//    if (empty($_GET['csrf']) || $_GET['csrf'] !== $_SESSION['csrf_token']) {
-//        header('HTTP/1.0 403 Forbidden');
-//        die('Invalid CSRF token');
-//    }
+    if (empty($_GET['csrf']) || !is_string($_GET['csrf'])
+        || !hash_equals($_SESSION['csrf_token'] ?? '', $_GET['csrf'])) {
+        header('HTTP/1.0 403 Forbidden');
+        die('Invalid CSRF token');
+    }
 
     $server_name = $_GET['server'] ?? '';
     $username = $_GET['username'] ?? '';
@@ -86,13 +91,16 @@ if (isset($_GET['action']) && $_GET['action'] === 'generate_config') {
     header('Content-Disposition: attachment; filename="' . $server['name'].'-'.$username . '.ovpn"');
     header('Content-Length: ' . strlen($config_content));
     echo $config_content;
-    $clean_url = strtok($_SERVER['REQUEST_URI'], '?');
-    header("Refresh:0; url=" . $clean_url);
     exit;
     }
 
 // Обработка создания пользователя
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'create_user') {
+    // Проверка CSRF
+    if (empty($_POST['csrf']) || !is_string($_POST['csrf'])
+        || !hash_equals($_SESSION['csrf_token'] ?? '', $_POST['csrf'])) {
+        send_json_response(false, 'Invalid CSRF token');
+    }
     process_create_user($servers);
     exit;
     }
@@ -480,7 +488,8 @@ function editCCD(server, username) {
             body: JSON.stringify({
                 server: server,
                 username: username,
-                config: textarea.value
+                config: textarea.value,
+                csrf: csrf
             })
         })
         .then(r => r.json())
@@ -498,7 +507,8 @@ function editCCD(server, username) {
     };
 
     // Загружаем текущее содержимое CCD
-    fetch(`get_user_config.php?server=${encodeURIComponent(server)}&username=${encodeURIComponent(username)}`, {
+    const csrf = document.querySelector('meta[name="csrf_token"]').content;
+    fetch(`get_user_config.php?server=${encodeURIComponent(server)}&username=${encodeURIComponent(username)}&csrf=${encodeURIComponent(csrf)}`, {
         headers: {'X-Requested-With': 'XMLHttpRequest'}
     })
     .then(r => r.text())
@@ -551,10 +561,12 @@ document.addEventListener('DOMContentLoaded', function() {
 function handleAction(serverName, action, clientName) {
     console.log('=== handleAction START ===');
     console.log('Server:', serverName, 'Action:', action, 'Client:', clientName);
+    const csrf = document.querySelector('meta[name="csrf_token"]').content;
     const params = new URLSearchParams();
     params.append('server', serverName);
     params.append('action', action);
     params.append('client', clientName);
+    params.append('csrf', csrf);
 
     fetch('handle_action.php', {
         method: 'POST',

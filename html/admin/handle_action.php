@@ -23,6 +23,13 @@ if (empty($_SERVER['HTTP_X_REQUESTED_WITH']) || $_SERVER['HTTP_X_REQUESTED_WITH'
     die(json_encode(['success' => false, 'message' => 'Direct access not allowed']));
 }
 
+// Проверяем CSRF-токен
+if (empty($_POST['csrf']) || !is_string($_POST['csrf'])
+    || !hash_equals($_SESSION['csrf_token'] ?? '', $_POST['csrf'])) {
+    http_response_code(403);
+    die(json_encode(['success' => false, 'message' => 'Invalid CSRF token']));
+}
+
 // Обработка POST-данных
 $server_name = $_POST['server'] ?? null;
 $action = $_POST['action'] ?? null;
@@ -30,6 +37,11 @@ $client_name = $_POST['client'] ?? null;
 
 if (!isset($servers[$server_name])) {
     die(json_encode(['success' => false, 'message' => 'Invalid server']));
+}
+
+// Имя клиента уходит в путь CCD-файла — валидируем жёстко
+if (!isValidUsername((string)$client_name)) {
+    die(json_encode(['success' => false, 'message' => 'Invalid client name']));
 }
 
 $server = $servers[$server_name];

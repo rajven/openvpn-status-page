@@ -12,11 +12,6 @@ if (empty($_SERVER['HTTP_X_REQUESTED_WITH']) || strtolower($_SERVER['HTTP_X_REQU
     dieAjaxError('Direct access not allowed');
 }
 
-// Опционально: CSRF проверка
-// if (empty($_POST['csrf']) || $_POST['csrf'] !== $_SESSION['csrf_token']) {
-//     dieAjaxError('Invalid CSRF token');
-// }
-
 define("CONFIG", 1);
 
 $config_file = __DIR__ . '/config.php';
@@ -25,15 +20,22 @@ if (!file_exists($config_file)) {
 }
 
 $servers = require $config_file;
+require_once 'functions.php';
 
 // Получаем данные POST в JSON
 $input = json_decode(file_get_contents('php://input'), true);
+
+// CSRF проверка (токен приходит в JSON-теле)
+if (empty($input['csrf']) || !is_string($input['csrf'])
+    || !hash_equals($_SESSION['csrf_token'] ?? '', $input['csrf'])) {
+    dieAjaxError('Invalid CSRF token');
+}
 
 $server_name = $input['server'] ?? '';
 $username    = $input['username'] ?? '';
 $config      = $input['config'] ?? '';
 
-if (!isset($servers[$server_name]) || empty($username) || $config === null) {
+if (!isset($servers[$server_name]) || !isValidUsername($username) || $config === null) {
     dieAjaxError('Invalid parameters');
 }
 

@@ -15,9 +15,10 @@ if (empty($_SERVER['HTTP_X_REQUESTED_WITH']) || strtolower($_SERVER['HTTP_X_REQU
 }
 
 // 2. Проверяем CSRF-токен
-//if (empty($_GET['csrf']) || $_GET['csrf'] !== $_SESSION['csrf_token']) {
-//    dieAjaxError('Invalid CSRF token');
-//}
+if (empty($_GET['csrf']) || !is_string($_GET['csrf'])
+    || !hash_equals($_SESSION['csrf_token'] ?? '', $_GET['csrf'])) {
+    dieAjaxError('Invalid CSRF token');
+}
 
 // Если все проверки пройдены, выполняем основной код
 function dieAjaxError($message) {
@@ -127,7 +128,7 @@ ob_start();
                         <button onclick="handleAction('<?= $server_name ?>', 'revoke', '<?= htmlspecialchars($client['name']) ?>')" 
                 	        class="btn ban-btn">Revoke</button>
                     <?php endif; ?>
-		    <button class="btn" onclick="editCCD('<?= $server_name ?>','<?= $client['name'] ?>')">Edit CCD</button>
+		    <button class="btn" onclick="editCCD('<?= $server_name ?>','<?= htmlspecialchars($client['name']) ?>')">Edit CCD</button>
                 </td>
             </tr>
             <?php endforeach; ?>
@@ -238,7 +239,7 @@ ob_start();
 			        <button onclick="return confirmAction('remove', '<?= htmlspecialchars($account['username']) ?>', '<?= $server_name ?>', event)"
                                         class="btn remove-btn">Remove CCD</button>
                                 <?php endif; ?>
-				    <button class="btn" onclick="editCCD('<?= $server_name ?>','<?= $account['username'] ?>')">Edit CCD</button>
+				    <button class="btn" onclick="editCCD('<?= $server_name ?>','<?= htmlspecialchars($account['username']) ?>')">Edit CCD</button>
                             <?php endif; ?>
                         </td>
                     </tr>

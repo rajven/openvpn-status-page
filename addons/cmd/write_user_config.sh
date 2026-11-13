@@ -28,6 +28,9 @@ main() {
 
     local input_file="$2"
 
+    # Validate CCD file name and path
+    validate_ccd_path "$ccd_file"
+
     # Validate CCD directory path (проверяет права на запись)
     check_ccd_path "$ccd_dir"
 

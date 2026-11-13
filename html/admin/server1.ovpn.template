@@ -17,7 +17,7 @@ resolv-retry infinite
 nobind
 persist-key
 persist-tun
-ns-cert-type server
+remote-cert-tls server
 
 verb 2
 mute 20

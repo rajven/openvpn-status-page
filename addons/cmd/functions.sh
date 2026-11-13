@@ -122,4 +122,31 @@ ensure_unique_subject() {
     # else: already correct, do nothing
 }
 
+# Validate a CCD file path received from the web layer (defense in depth).
+# The web app already validates usernames, but the scripts must not trust it:
+# forbid path traversal, control characters and unsafe file names.
+validate_ccd_path() {
+    local path="$1"
+    local base
+
+    base="$(basename "$path")"
+
+    if [[ ! "$base" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]]; then
+        log "Error: Invalid CCD file name: '$base'"
+        exit 1
+    fi
+
+    # Reject any '..' path component
+    if [[ "$path" =~ (^|/)\.\.(/|$) ]]; then
+        log "Error: Path traversal attempt: '$path'"
+        exit 1
+    fi
+
+    # Reject control characters (newlines etc.)
+    if [[ "$path" =~ [[:cntrl:]] ]]; then
+        log "Error: Control characters in CCD path: '$path'"
+        exit 1
+    fi
+}
+
 #mlog "Script called with: $0 $@"

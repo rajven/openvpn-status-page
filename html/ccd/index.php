@@ -29,6 +29,12 @@ if (isset($_SERVER['PHP_AUTH_USER'])) {
         showApacheAuthRequired();
 }
 
+// Имя пользователя уходит в пути внутри PKI (show_client_crt.sh ищет
+// issued/<CN>.crt) — запрещаем слэши и '..' против обхода каталогов
+if ($is_authenticated && (preg_match('#[/\\\\]#', $username) || preg_match('#(^|/)\.\.(/|$)#', $username))) {
+    die('Invalid username');
+}
+
 $server_name = $_GET['server'] ?? $_POST['server'] ?? 'server1';
 
 // Если авторизованы через Apache - генерируем конфиг

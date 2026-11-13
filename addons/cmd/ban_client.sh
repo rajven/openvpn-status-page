@@ -26,6 +26,7 @@ main() {
     local action="$2"
 
     # Validate CCD file path
+    validate_ccd_path "$ccd_file"
     check_ccd_path "$ccd_file"
 
     local username

@@ -12,10 +12,11 @@ if (empty($_SERVER['HTTP_X_REQUESTED_WITH']) || strtolower($_SERVER['HTTP_X_REQU
     dieAjaxError('Direct access not allowed');
 }
 
-// Опционально: CSRF проверка
-// if (empty($_GET['csrf']) || $_GET['csrf'] !== $_SESSION['csrf_token']) {
-//     dieAjaxError('Invalid CSRF token');
-// }
+// CSRF проверка
+if (empty($_GET['csrf']) || !is_string($_GET['csrf'])
+    || !hash_equals($_SESSION['csrf_token'] ?? '', $_GET['csrf'])) {
+    dieAjaxError('Invalid CSRF token');
+}
 
 define("CONFIG", 1);
 
@@ -25,11 +26,12 @@ if (!file_exists($config_file)) {
 }
 
 $servers = require $config_file;
+require_once 'functions.php';
 
 $server_name = $_GET['server'] ?? '';
 $username = $_GET['username'] ?? '';
 
-if (!isset($servers[$server_name]) || empty($username)) {
+if (!isset($servers[$server_name]) || !isValidUsername($username)) {
     http_response_code(400);
     die('Invalid parameters');
 }

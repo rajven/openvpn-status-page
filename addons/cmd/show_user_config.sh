@@ -27,6 +27,9 @@ main() {
     local ccd_dir
     ccd_dir=$(dirname "$ccd_file")
 
+    # Validate CCD file name and path
+    validate_ccd_path "$ccd_file"
+
     # Validate CCD directory path
     check_ccd_path "$ccd_dir"
 

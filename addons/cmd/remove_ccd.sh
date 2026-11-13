@@ -25,6 +25,7 @@ main() {
     local ccd_file="$1"
 
     # Validate CCD file path
+    validate_ccd_path "$ccd_file"
     check_ccd_path "$ccd_file"
 
     # Check if file exists before removal
