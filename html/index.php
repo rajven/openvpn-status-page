@@ -180,8 +180,8 @@
             <tr>
                 <th>Разделы</th>
                 <td>
-                    <a href="/admin/" target="_blank">Панель администратора</a> ·
-                    <a href="/ccd/" target="_blank">Уголок пользователя</a>
+                    <a href="/admin/" target="_blank">Панель&nbspадминистратора</a> ·
+                    <a href="/ccd/" target="_blank">Уголок&nbspпользователя</a>
                 </td>
             </tr>
         </table>
